@@ -345,6 +345,8 @@ export type ModelChannel = {
     secretKey?: string;
     headers?: ChannelHeader[];
     apiFormat: ApiCallFormat;
+    /** 仅决定模型目录的供应商预设与默认 Base URL；实际请求协议仍由 apiFormat 和模型协议决定。 */
+    catalogConnectionType?: ChannelCatalogConnectionType;
     interfaceType?: ChannelInterfaceType;
     models: string[];
     // 仅平台目录使用：将已保存的旧 SKU 选择重定向到当前模型家族。
@@ -377,6 +379,8 @@ export type ModelChannel = {
     transport?: "backend-channel" | "local-runtime";
     localModels?: DreaminaLocalModel[];
 };
+
+export type ChannelCatalogConnectionType = "openai" | "gemini" | "qwen" | "seedance" | "minimax" | "glm" | "deepseek" | "local";
 
 export type AiConfig = {
     channelMode: "remote" | "local";
@@ -420,6 +424,12 @@ export type ModelCapability = "image" | "video" | "text" | "audio";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const OPENAI_BASE_URL = "https://api.openai.com";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+const QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const SEEDANCE_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+const MINIMAX_BASE_URL = "https://api.minimaxi.com/v1";
+const GLM_BASE_URL = "https://open.bigmodel.cn/api/paas/v4";
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const LOCAL_BASE_URL = "http://127.0.0.1:11434/v1";
 const LEGACY_DEFAULT_MODEL_NAMES = new Set(["gpt-image-2", "grok-imagine-video", "gpt-5.5", "gpt-4o-mini-tts"]);
 
 export const defaultConfig: AiConfig = {
@@ -795,6 +805,7 @@ export function createModelChannel(channel?: Partial<ModelChannel>): ModelChanne
         secretKey: channel?.secretKey || "",
         headers: Array.isArray(channel?.headers) ? channel.headers.map((header) => ({ name: String(header.name || ""), value: String(header.value || "") })) : [],
         apiFormat,
+        catalogConnectionType: normalizeChannelCatalogConnectionType(channel?.catalogConnectionType) || (apiFormat === "gemini" ? "gemini" : "openai"),
         interfaceType,
         models: uniqueRawModels(channel?.models || []),
         scope: channel?.scope === "system" ? "system" : "user",
@@ -968,6 +979,21 @@ function isEmptyDefaultChannel(channel: ModelChannel) {
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
     return apiFormat === "gemini" ? GEMINI_BASE_URL : OPENAI_BASE_URL;
+}
+
+export function defaultBaseUrlForCatalogConnection(connection: ChannelCatalogConnectionType) {
+    if (connection === "gemini") return GEMINI_BASE_URL;
+    if (connection === "qwen") return QWEN_BASE_URL;
+    if (connection === "seedance") return SEEDANCE_BASE_URL;
+    if (connection === "minimax") return MINIMAX_BASE_URL;
+    if (connection === "glm") return GLM_BASE_URL;
+    if (connection === "deepseek") return DEEPSEEK_BASE_URL;
+    if (connection === "local") return LOCAL_BASE_URL;
+    return OPENAI_BASE_URL;
+}
+
+function normalizeChannelCatalogConnectionType(value: unknown): ChannelCatalogConnectionType | undefined {
+    return value === "openai" || value === "gemini" || value === "qwen" || value === "seedance" || value === "minimax" || value === "glm" || value === "deepseek" || value === "local" ? value : undefined;
 }
 
 export function defaultBaseUrlForChannelInterface(interfaceType?: ChannelInterfaceType) {

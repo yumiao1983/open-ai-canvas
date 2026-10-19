@@ -1,26 +1,73 @@
-import { App, Button, Form, Input, Popconfirm, Segmented, Select, Switch, Tooltip } from "antd";
+import { App, Button, Form, Input, Popconfirm, Select, Switch, Tooltip } from "antd";
 import { Pencil, MonitorUp, Plus, RefreshCw, Trash2, Workflow } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ModelEditorModal } from "@/components/model-editor-modal";
 import { ChannelHeadersEditor, validateChannelHeaders } from "@/components/channel-headers-editor";
 import { WorkspaceState } from "@/components/layout/workspace-state";
-import { mergeFetchedChannelModelCosts } from "@/lib/channel-model-catalog";
+import { mergeFetchedChannelModelCosts, type ChannelModelCatalogItem } from "@/lib/channel-model-catalog";
+import { defaultModelCapabilityConfig } from "@/lib/model-capabilities";
 import { desktopLocalChannelFormState, desktopLocalChannelPayloadValue, DESKTOP_LOCAL_CHANNEL_EXAMPLE_BASE_URL } from "@/lib/desktop-local-channel";
 import { fetchChannelModels } from "@/services/api/image";
 import {
     createModelChannel,
-    defaultBaseUrlForApiFormat,
+    defaultBaseUrlForCatalogConnection,
     filterModelsByCapability,
     modelOptionsFromChannels,
     useConfigStore,
     type AiConfig,
+    type ChannelCatalogConnectionType,
     type ModelChannel,
 } from "@/stores/use-config-store";
 import { ChannelModelSettings } from "./channel-video-pricing";
 import { useUserStore } from "@/stores/use-user-store";
+import { savePersonalChannelConfig } from "@/services/api/auth";
 
-type UserChannelConnection = "openai" | "gemini";
+type UserChannelConnection = ChannelCatalogConnectionType;
+
+const catalogConnectionOptions: Array<{ label: string; value: UserChannelConnection }> = [
+    { label: "OpenAI", value: "openai" },
+    { label: "Gemini", value: "gemini" },
+    { label: "Qwen", value: "qwen" },
+    { label: "Seedance", value: "seedance" },
+    { label: "MiniMax", value: "minimax" },
+    { label: "GLM", value: "glm" },
+    { label: "DeepSeek", value: "deepseek" },
+    { label: "Local model", value: "local" },
+];
+
+const DEEPSEEK_MODELS = ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"];
+/** MiniMax does not expose every media product through its OpenAI-compatible
+ * /models endpoint. Keep the documented product directory here so a refresh
+ * never hides speech, music or voice tools from a user's channel. */
+const MINIMAX_CATALOG: ChannelModelCatalogItem[] = [
+    { id: "MiniMax-M2", modelType: "text" },
+    { id: "MiniMax-M2.1", modelType: "text" },
+    { id: "MiniMax-M2.1-lightning", modelType: "text" },
+    { id: "MiniMax-M2.1-highspeed", modelType: "text" },
+    { id: "MiniMax-M2.5", modelType: "text" },
+    { id: "MiniMax-M2.5-lightning", modelType: "text" },
+    { id: "MiniMax-M2.5-highspeed", modelType: "text" },
+    { id: "MiniMax-M2.7", modelType: "text" },
+    { id: "MiniMax-M2.7-highspeed", modelType: "text" },
+    { id: "MiniMax-M3", modelType: "text" },
+    { id: "MiniMax-Hailuo-2.3", modelType: "video" },
+    { id: "MiniMax-Hailuo-2.3-Fast", modelType: "video" },
+    { id: "MiniMax-Hailuo-02", modelType: "video" },
+    { id: "MiniMax-H3", modelType: "video" },
+    { id: "speech-2.6-hd", modelType: "audio" },
+    { id: "speech-2.6-turbo", modelType: "audio" },
+    { id: "speech-2.8-hd", modelType: "audio" },
+    { id: "speech-2.8-turbo", modelType: "audio" },
+    { id: "speech-02-hd", modelType: "audio" },
+    { id: "speech-02-turbo", modelType: "audio" },
+    { id: "music-2.0", modelType: "audio" },
+    { id: "music-2.5", modelType: "audio" },
+    { id: "music-2.5+", modelType: "audio" },
+    { id: "music-2.6", modelType: "audio" },
+    { id: "voice_clone", modelType: "audio" },
+    { id: "voice_design", modelType: "audio" },
+];
 type ChannelSettingsPaneProps = {
     onOpenModels: () => void;
     onOpenRunningHub?: () => void;
@@ -40,8 +87,22 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
     const runningHubReady = Boolean(config.runningHub.enabled && config.runningHub.baseUrl.trim() && config.runningHub.apiKey.trim() && config.runningHub.workflowId.trim());
     const comfyBridgeReady = Boolean(config.comfyBridge.enabled && config.comfyBridge.bridgeId.trim() && config.comfyBridge.workflowId.trim());
 
+    // Upgrade saved MiniMax channels created before media presets were added.
+    // This is deliberately local and idempotent: it never removes models a user
+    // fetched or entered themselves.
+    useEffect(() => {
+        const channels = config.channels.map((channel) => isMiniMaxChannel(channel)
+            ? mergeMiniMaxCatalogChannel(channel)
+            : channel);
+        if (channels.some((channel, index) => channel !== config.channels[index])) {
+            replaceConfig(withChannels(config, channels));
+        }
+    }, [config, replaceConfig]);
+
     const updateChannels = (channels: ModelChannel[], baseConfig = config) => {
         replaceConfig(withChannels(baseConfig, channels));
+        void savePersonalChannelConfig(channels.filter((channel) => channel.scope !== "system"))
+            .catch(() => message.error("个人渠道保存到数据库失败，请稍后重试"));
     };
 
     const updateChannel = (id: string, patch: Partial<ModelChannel>) => {
@@ -58,11 +119,23 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
     };
 
     const updateChannelConnection = (channel: ModelChannel, connection: UserChannelConnection) => {
-        const apiFormat = connection;
-        const defaultBaseUrl = defaultBaseUrlForApiFormat(apiFormat);
+        const apiFormat = connection === "gemini" ? "gemini" : "openai";
+        const defaultBaseUrl = defaultBaseUrlForCatalogConnection(connection);
         const baseUrl = isKnownDefaultBaseUrl(channel.baseUrl) ? defaultBaseUrl : channel.baseUrl;
+        const models = connection === "deepseek"
+            ? uniqueModels([...channel.models, ...DEEPSEEK_MODELS])
+            : connection === "minimax"
+                ? uniqueModels([...channel.models, ...MINIMAX_CATALOG.map((item) => item.id)])
+                : channel.models;
         // 渠道只负责连接类型；具体模型能力和请求协议由下方共享能力卡片维护。
-        updateChannel(channel.id, { apiFormat, interfaceType: undefined, baseUrl });
+        updateChannel(channel.id, {
+            apiFormat,
+            catalogConnectionType: connection,
+            interfaceType: undefined,
+            baseUrl,
+            models,
+            ...(connection === "minimax" ? { modelCosts: mergeMiniMaxModelCosts(models, channel.modelCosts || []) } : {}),
+        });
     };
 
     const addChannel = () => {
@@ -111,10 +184,7 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                 message.warning(`${latestChannel.name || "当前渠道"}的连接配置已改变，已忽略旧的拉取结果`);
                 return;
             }
-            updateChannels(
-                latestConfig.channels.map((item) => (item.id === channel.id ? { ...item, models: result.models, modelCosts: mergeFetchedChannelModelCosts(item, result.catalog) } : item)),
-                latestConfig,
-            );
+            updateChannels(latestConfig.channels.map((item) => (item.id === channel.id ? fetchedChannelPatch(item, result) : item)), latestConfig);
             message.success(`${latestChannel.name || "当前渠道"}模型列表已更新`);
         } catch (error) {
             message.error(channelModelFetchErrorMessage(error));
@@ -159,7 +229,7 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                 updateChannels(
                     latestConfig.channels.map((channel) => {
                         const fetched = resultMap.get(channel.id);
-                        return fetched ? { ...channel, models: fetched.models, modelCosts: mergeFetchedChannelModelCosts(channel, fetched.catalog) } : channel;
+                        return fetched ? fetchedChannelPatch(channel, fetched) : channel;
                     }),
                     latestConfig,
                 );
@@ -262,7 +332,7 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
                                                 </div>
                                                 <div className="model-editor-connection-fields grid gap-3 sm:grid-cols-2">
                                                     <Form.Item label="渠道名称" htmlFor={`channel-${channel.id}-name`} className="mb-0 sm:col-span-1"><Input id={`channel-${channel.id}-name`} value={channel.name} placeholder="例如：我的 NewAPI" onChange={(event) => updateChannel(channel.id, { name: event.target.value })} onBlur={(event) => updateChannel(channel.id, { name: event.target.value.trim() || "未命名渠道" })} /></Form.Item>
-                                                    <Form.Item label="目录连接类型" className="mb-0 sm:col-span-1" extra="仅影响模型目录拉取。"><Segmented<UserChannelConnection> block value={channelConnectionMode(channel)} options={[{ label: "OpenAI", value: "openai" }, { label: "Gemini", value: "gemini" }]} onChange={(value) => updateChannelConnection(channel, value)} /></Form.Item>
+                                                    <Form.Item label="目录连接类型" className="mb-0 sm:col-span-1" extra="选择供应商后会填入对应的默认 Base URL；仅影响模型目录拉取。"><Select<UserChannelConnection> value={channelConnectionMode(channel)} options={catalogConnectionOptions} onChange={(value) => updateChannelConnection(channel, value)} /></Form.Item>
                                                     <UserLocalChannelFields
                                                         channel={channel}
                                                         visible={userLocalChannelFormOwner(desktopLocalChannelsEnabled, desktopLocalChannelHostname, channel.allowLocalChannel).visible}
@@ -294,6 +364,11 @@ export function ChannelSettingsPane({ onOpenModels, onOpenRunningHub, onOpenComf
             ) : <WorkspaceState icon="settings" compact title="当前没有个人模型渠道" description="管理员配置的系统渠道会出现在模型选择中；也可以添加自己的模型服务。" action={<Button icon={<Plus className="size-4" />} onClick={addChannel}>新增个人模型渠道</Button>} />}
         </Form>
     );
+}
+
+export function normalizeMiniMaxChannels(config: AiConfig): AiConfig | null {
+    const channels = config.channels.map((channel) => isMiniMaxChannel(channel) ? mergeMiniMaxCatalogChannel(channel) : channel);
+    return channels.some((channel, index) => channel !== config.channels[index]) ? withChannels(config, channels) : null;
 }
 
 function WorkflowChannelEntry({ icon, title, description, status, ready, onOpen }: { icon: ReactNode; title: string; description: string; status: string; ready: boolean; onOpen?: () => void }) {
@@ -369,6 +444,69 @@ function ChannelStatus({ channel }: { channel: ModelChannel }) {
     );
 }
 
+function fetchedChannelPatch(channel: ModelChannel, result: Awaited<ReturnType<typeof fetchChannelModels>>) {
+    const catalog = isMiniMaxChannel(channel) ? mergeMiniMaxCatalog(result.catalog) : result.catalog;
+    const models = uniqueModels(catalog.map((item) => item.id));
+    const modelCosts = mergeFetchedChannelModelCosts(channel, catalog);
+    return {
+        ...channel,
+        models,
+        modelCosts: isMiniMaxChannel(channel) ? mergeMiniMaxModelCosts(models, modelCosts) : modelCosts,
+    };
+}
+
+function mergeMiniMaxCatalog(catalog: ChannelModelCatalogItem[]) {
+    const all = new Map(catalog.map((item) => [item.id, item]));
+    for (const item of MINIMAX_CATALOG) all.set(item.id, { ...all.get(item.id), ...item });
+    return Array.from(all.values());
+}
+
+function mergeMiniMaxModelCosts(models: string[], costs: NonNullable<ModelChannel["modelCosts"]>) {
+    const existing = new Map(costs.map((item) => [item.model, item]));
+    for (const preset of MINIMAX_CATALOG) {
+        if (!models.includes(preset.id)) continue;
+        const current = existing.get(preset.id);
+        const protocol = miniMaxProtocolFor(preset.id, preset.modelType || "text");
+        existing.set(preset.id, {
+            model: preset.id,
+            ...(current || {}),
+            capability: preset.modelType || "text",
+            protocol,
+            billingMode: current?.billingMode || "fixed_request",
+            unitPriceMicrocredits: current?.unitPriceMicrocredits || 0,
+            ...(preset.modelType === "video" ? { capabilityConfig: defaultModelCapabilityConfig(protocol, preset.id) } : {}),
+        });
+    }
+    return models.flatMap((model) => {
+        const item = existing.get(model);
+        return item ? [item] : [];
+    });
+}
+
+function miniMaxProtocolFor(model: string, capability: ChannelModelCatalogItem["modelType"]) {
+    if (capability === "video") return "minimax-video";
+    if (model.startsWith("speech-")) return "minimax-speech";
+    if (model.startsWith("music-")) return "minimax-music";
+    if (model === "voice_clone") return "minimax-voice-clone";
+    if (model === "voice_design") return "minimax-voice-design";
+    return "chat-completion";
+}
+
+function mergeMiniMaxCatalogChannel(channel: ModelChannel): ModelChannel {
+    const models = uniqueModels([...channel.models, ...MINIMAX_CATALOG.map((item) => item.id)]);
+    const modelCosts = mergeMiniMaxModelCosts(models, channel.modelCosts || []);
+    const unchanged = models.length === channel.models.length
+        && models.every((model, index) => model === channel.models[index])
+        && JSON.stringify(modelCosts) === JSON.stringify(channel.modelCosts || []);
+    return unchanged ? channel : { ...channel, models, modelCosts };
+}
+
+function isMiniMaxChannel(channel: ModelChannel) {
+    return channel.catalogConnectionType === "minimax"
+        || channel.baseUrl.toLowerCase().includes("minimaxi.com")
+        || channel.models.some((model) => /^minimax-|^speech-|^music-|^voice_(clone|design)$/i.test(model));
+}
+
 function withChannels(config: AiConfig, channels: ModelChannel[]): AiConfig {
     const models = modelOptionsFromChannels(channels);
     const imageModels = filterModelsByCapability(models, "image", channels);
@@ -393,7 +531,7 @@ function channelModelFetchErrorMessage(error: unknown) {
 }
 
 function channelConnectionMode(channel: ModelChannel): UserChannelConnection {
-    return channel.apiFormat === "gemini" ? "gemini" : "openai";
+    return channel.catalogConnectionType || (channel.apiFormat === "gemini" ? "gemini" : "openai");
 }
 
 function channelConnectionError(channel: ModelChannel) {
@@ -415,13 +553,15 @@ function channelConnectionSignature(channel: ModelChannel) {
 }
 
 function channelProtocolLabel(channel: ModelChannel) {
-    return channelConnectionMode(channel) === "gemini" ? "Gemini 原生" : "OpenAI 兼容";
+    const connection = channelConnectionMode(channel);
+    const provider = catalogConnectionOptions.find((item) => item.value === connection)?.label || "OpenAI";
+    return connection === "gemini" ? "Gemini 原生" : `${provider} · OpenAI 兼容`;
 }
 
 function isKnownDefaultBaseUrl(value: string) {
     const normalized = value.trim().replace(/\/+$/, "");
     if (!normalized) return true;
-    return [defaultBaseUrlForApiFormat("openai"), defaultBaseUrlForApiFormat("gemini")].some((candidate) => candidate.replace(/\/+$/, "") === normalized);
+    return catalogConnectionOptions.some((option) => defaultBaseUrlForCatalogConnection(option.value).replace(/\/+$/, "") === normalized);
 }
 
 function requiresSecretKey(channel: ModelChannel) {

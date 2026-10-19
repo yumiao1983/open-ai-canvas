@@ -458,11 +458,16 @@ type providerMediaHydrationPolicy struct {
 func providerMediaHydrationPolicyFor(ctx context.Context, input canvasGenerationInput) providerMediaHydrationPolicy {
 	policy := providerMediaHydrationPolicy{preferURL: providerPrefersMediaURLs(input.Config.InterfaceType, input)}
 	switch strings.TrimSpace(input.Config.InterfaceType) {
-	case string(model.ChannelInterfaceNewAPIVideo), string(model.ChannelInterfaceNewAPIChannel1), string(model.ChannelInterfaceNewAPIChannel2), string(model.ChannelInterfaceVolcengineArkVideo), string(model.ChannelInterfaceMiniMaxVideo):
+	case string(model.ChannelInterfaceNewAPIVideo), string(model.ChannelInterfaceNewAPIChannel1), string(model.ChannelInterfaceNewAPIChannel2), string(model.ChannelInterfaceVolcengineArkVideo):
 		policy.requireURL = true
 		policy.preferURL = true
+	case string(model.ChannelInterfaceMiniMaxVideo):
+		// MiniMax accepts both public URLs and data URLs. Keep object-storage
+		// references as URLs, but encode local project resources so a local
+		// development server does not need a public address merely to generate.
+		policy.preferURL = true
 	}
-	if adapter, ok := protocolAdapterForContext(ctx, input.Config.InterfaceType); ok && adapter.Metadata().RequiresPublicMediaURLs {
+	if adapter, ok := protocolAdapterForContext(ctx, input.Config.InterfaceType); ok && adapter.Metadata().RequiresPublicMediaURLs && input.Config.InterfaceType != string(model.ChannelInterfaceMiniMaxVideo) {
 		policy.requireURL = true
 		policy.preferURL = true
 	}
@@ -2373,6 +2378,15 @@ func runAudioTask(ctx context.Context, input canvasGenerationInput) (map[string]
 	if _, ok := declarativeProtocolAdapterForContext(ctx, input.Config.InterfaceType); ok {
 		return runDeclarativeProtocolTask(ctx, input)
 	}
+	if input.Config.InterfaceType == "minimax-speech" {
+		return runMiniMaxSpeechTask(ctx, input)
+	}
+	if input.Config.InterfaceType == "minimax-music" {
+		return runMiniMaxMusicTask(ctx, input)
+	}
+	if input.Config.InterfaceType == "minimax-voice-clone" || input.Config.InterfaceType == "minimax-voice-design" {
+		return nil, errors.New("MiniMax 音色工具需要在音色工具页上传素材或填写音色描述，不能直接作为普通音频生成模型调用")
+	}
 	if resolved, ok := input.Metadata["resolvedCharacterVersions"].([]interface{}); ok && len(resolved) > 0 {
 		voiceKey := metadataString(input.Metadata, "resolvedCharacterVoiceKey")
 		if voiceKey == "" || strings.TrimSpace(input.Config.AudioVoice) != voiceKey {
@@ -2405,6 +2419,76 @@ func runAudioTask(ctx context.Context, input canvasGenerationInput) (map[string]
 		return nil, err
 	}
 	return map[string]interface{}{"mode": "audio", "audio": map[string]interface{}{"dataUrl": dataURL(mimeType, data), "mimeType": mimeType, "format": format}}, nil
+}
+
+// MiniMax speech and music are JSON APIs which return hexadecimal audio,
+// unlike OpenAI's /audio/speech binary response.
+func runMiniMaxSpeechTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	format := defaultString(input.Config.AudioFormat, "mp3")
+	body := map[string]interface{}{
+		"model":  input.Config.Model,
+		"text":   input.Prompt,
+		"stream": false,
+		"voice_setting": map[string]interface{}{
+			"voice_id": defaultString(input.Config.AudioVoice, "male-qn-qingse"),
+			"speed":    parseFloat(input.Config.AudioSpeed, 1),
+			"vol":      1,
+			"pitch":    0,
+		},
+		"audio_setting": map[string]interface{}{"format": format, "sample_rate": 32000, "bitrate": 128000, "channel": 1},
+	}
+	return miniMaxAudioResponse(ctx, input.Config, "/t2a_v2", body, format)
+}
+
+func runMiniMaxMusicTask(ctx context.Context, input canvasGenerationInput) (map[string]interface{}, error) {
+	format := defaultString(input.Config.AudioFormat, "mp3")
+	body := map[string]interface{}{"model": input.Config.Model, "prompt": input.Prompt, "stream": false, "output_format": format}
+	if instructions := strings.TrimSpace(input.Config.AudioInstructions); instructions != "" {
+		body["lyrics"] = instructions
+	}
+	return miniMaxAudioResponse(ctx, input.Config, "/music_generation", body, format)
+}
+
+func miniMaxAudioResponse(ctx context.Context, config providerConfig, path string, body map[string]interface{}, format string) (map[string]interface{}, error) {
+	var payload struct {
+		BaseResp struct {
+			StatusCode int    `json:"status_code"`
+			StatusMsg  string `json:"status_msg"`
+		} `json:"base_resp"`
+		Data struct {
+			Audio string `json:"audio"`
+		} `json:"data"`
+	}
+	if err := postJSON(ctx, config, path, body, &payload); err != nil {
+		return nil, err
+	}
+	if payload.BaseResp.StatusCode != 0 {
+		return nil, fmt.Errorf("MiniMax 请求失败：%s", defaultString(payload.BaseResp.StatusMsg, "未知错误"))
+	}
+	data, err := hex.DecodeString(strings.TrimSpace(payload.Data.Audio))
+	if err != nil || len(data) == 0 {
+		return nil, errors.New("MiniMax 未返回有效音频数据")
+	}
+	mimeType, err := validateGeneratedAudio(audioMimeType(format), data, format)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"mode": "audio", "audio": map[string]interface{}{"dataUrl": dataURL(mimeType, data), "mimeType": mimeType, "format": format}}, nil
+}
+
+func audioMimeType(format string) string {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "wav":
+		return "audio/wav"
+	case "pcm":
+		return "audio/pcm"
+	case "flac":
+		return "audio/flac"
+	case "opus":
+		return "audio/ogg"
+	default:
+		return "audio/mpeg"
+	}
 }
 
 // runDeclarativeProtocolTask is the host runtime for JSON manifest plugins.

@@ -5,6 +5,27 @@ description: 当前项目已实现功能的手工验证清单与未确认边界
 
 # 待测试
 
+## 自定义渠道供应商 Base URL 预设
+
+- 「个人渠道 → 新增/编辑自定义渠道」的目录连接类型增加 Qwen、Seedance、MiniMax、GLM、DeepSeek 和 Local model；选择供应商会写入目录连接类型，并在原 Base URL 为空或仍为任一系统预设时自动填入对应 Base URL。用户已输入的自定义 URL 不会被替换。
+- Qwen 使用 `https://dashscope.aliyuncs.com/compatible-mode/v1`，Seedance 使用 `https://ark.cn-beijing.volces.com/api/v3`，MiniMax（中国大陆）使用 `https://api.minimaxi.com/v1`，GLM 使用 `https://open.bigmodel.cn/api/paas/v4`，DeepSeek 使用 `https://api.deepseek.com`，本地模型默认 `http://127.0.0.1:11434/v1`。选择 DeepSeek 时，模型列表会预置 `deepseek-v4-flash`、`deepseek-v4-pro` 和 `deepseek-v4-flash-vision-exp`，且不会清除已有手工模型。除 Gemini 外，目录拉取仍以 OpenAI 兼容格式执行；具体生成协议仍在模型能力配置中选择。
+- [ ] 在真实渠道密钥下依次选择每种类型，确认 Base URL 自动填入、手工 URL 保持不变，且模型拉取/手工模型添加及保存后重开都正确。Local model 需要部署方显式启用本机渠道安全配置后才能由后端访问。
+- MiniMax 的 `/models` 目录不会完整列出异步媒体模型。选择、刷新或重新打开 MiniMax 渠道时，影策会合并文本、Hailuo/H3 视频、语音合成、音乐生成、音色复刻与音色设计目录；已保存的旧 Hailuo 配置会从错误的「文本」自动迁移为「视频 / minimax-video」。模型选择页将音频拆为语音合成、音乐生成、音色复刻和音色设计四类。
+- `speech-*` 使用 MiniMax `POST /t2a_v2`，`music-*` 使用 `POST /music_generation`，并解析其十六进制音频响应；音色复刻与音色设计需要各自的素材上传或音色描述，因此目前只在目录中标注为音色工具，不能作为普通提示词音频任务直接运行。
+- [ ] 使用有效 MiniMax 密钥刷新渠道后，确认文本、视频、语音、音乐和两项音色工具均在模型选择出现；测试任一 `speech-*` 与 `music-*` 模型能返回可播放音频。音色工具需在后续独立工作台中验收上传、预览和音色 ID 保存流程。
+
+## 工作区语言包与语言选择
+
+- 前端新增独立的 `web/src/i18n/en-US.ts` 与 `web/src/i18n/zh-CN.ts` 语言包，以及持久化的 `sceneform:locale` 偏好。语言切换会同步更新 HTML `lang`、Ant Design 内置文案、工作区导航、Settings、画布入口与导演台模式。
+- Settings 的 Preferences 中新增「Workspace language」选择器，可在 English 和简体中文之间即时切换；语言包使用稳定键名，后续页面文案必须先加入两个语言文件，再通过 `useTranslation()` 引用，不能继续以同一份硬编码文本同时充当两种语言。
+- [ ] 在真实登录态中分别选择 English 和简体中文，确认刷新后保留选择，并检查 Settings、Canvas、Director workspace、菜单、弹窗、键盘焦点及窄屏布局。
+
+## Sceneform 国际化工作区 UI
+
+- 主工作区重设为深石墨画布、暖白文字与琥珀色动作标识；侧栏、顶栏和画布工作区采用连续的全宽布局，默认品牌文案为 Sceneform。
+- 可见的主导航、画布库、画布顶栏以及导演工作台主操作已改为英文；导演工作台模式为 Layout、Pose、Animate 和 Camera。真实的画布、任务、模型渠道和本机 Codex 连接流程保持原有实现。
+- [ ] 前端构建完成后，在登录态下检查 Home、Canvas、Canvas editor 和 Director workspace 的深浅主题、窄屏布局、键盘焦点及菜单/弹窗；确认新英文默认文案不会覆盖管理员保存的站点外观配置。
+
 ## Tiptap 依赖版本对齐
 
 - Tiptap 核心、React、扩展及间接依赖统一锁定为 `3.28.0`，同步 Bun 与 pnpm 锁文件；显式声明 `pm` 和 `extensions`，避免 pnpm 保留旧 peer 解析。此项不修改编辑器业务代码和 UI 样式。
@@ -1250,3 +1271,11 @@ v2（用户反馈首版难看后重做）：菜单改用 antd Dropdown（placeme
 - [ ] 让 AI 回复含多行代码（如 markdown 围栏 ```ts```）：代码块顶部有语言标签 + 复制按钮，点复制后变「已复制」，粘贴内容正确（不含语言标记行）。
 - [ ] 代码块圆角/边框/底色在明暗主题均可辨；长代码横向滚动不破版；流式输出中代码块容器稳定不跳动、复制按钮可用。
 - [ ] 消息中的行内代码（如 `const x`）样式不受影响；画布 Agent 消息里的代码块同样获得新外壳。
+## 画布 Agent 会话提交修复
+
+已修复新建会话后内部会话引用仍停留在旧会话的问题：第一条消息现在会写入新会话、进入后端请求，并在同一会话中展示回复；Agent 输入框支持 Enter 发送、Shift+Enter 换行。DeepSeek 推理模型拒绝首步 `tool_choice=required` 时，Agent 会自动以 `auto` 重试一次。已通过 TypeScript 类型检查，需浏览器验收：
+
+- [ ] 在画布 Agent 点击「新建对话」后输入一条文本并按 Enter：该文本立即显示在当前会话，输入框清空，随后出现处理中状态与模型回复。
+- [ ] 刷新页面后，刚创建的会话和用户消息仍存在；不会重新显示旧会话内容或丢失第一条消息。
+- [ ] 在输入框按 Shift+Enter：保留多行文本，不提交请求；点击发送按钮与按 Enter 的结果一致。
+- [ ] 选择 DeepSeek 渠道的推理模型发送画布 Agent 指令：首个强制工具调用被拒绝后自动改为自动工具选择，页面应出现回复而不是「模型服务拒绝了请求」。

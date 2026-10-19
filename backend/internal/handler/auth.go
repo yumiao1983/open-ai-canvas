@@ -198,6 +198,37 @@ func RegisterAuthRoutes(r *gin.RouterGroup, svc *service.Service) {
 		}
 		ok(c, gin.H{"channels": channels})
 	})
+	r.GET("/user/channel-config", func(c *gin.Context) {
+		actor, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		config, err := svc.PersonalChannelConfig(actor)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, config)
+	})
+	r.PUT("/user/channel-config", func(c *gin.Context) {
+		actor, err := currentUser(c, svc)
+		if err != nil {
+			failService(c, err)
+			return
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+		var input service.PersonalChannelConfig
+		if err := c.ShouldBindJSON(&input); err != nil {
+			fail(c, http.StatusBadRequest, err)
+			return
+		}
+		if err := svc.SavePersonalChannelConfig(actor, input); err != nil {
+			failService(c, err)
+			return
+		}
+		ok(c, gin.H{"saved": true})
+	})
 }
 
 // 兼容已在 Linux.do OAuth 应用中登记的传统回调地址，处理逻辑与 /api/auth/linuxdo/callback 完全一致。

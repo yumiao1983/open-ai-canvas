@@ -30,12 +30,14 @@ import { primeResourceBlobCache } from "@/services/resource-blob-cache";
 import { useSyncProgressStore } from "@/stores/use-sync-progress-store";
 import { ensureCanvasNodeAsset } from "@/services/project-asset-sync";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
+import { useTranslation } from "@/i18n";
 
 const CanvasDeleteProjectsDialog = lazy(() => import("@/components/canvas/canvas-delete-projects-dialog").then((module) => ({ default: module.CanvasDeleteProjectsDialog })));
 
 export default function CanvasPage() {
     const { message } = App.useApp();
     const brandName = useAppearanceStore((state) => state.appearance.brandName);
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const inputRef = useRef<HTMLInputElement>(null);
@@ -113,13 +115,13 @@ export default function CanvasPage() {
     const hasMore = userId ? libraryQuery.hasNextPage : visibleProjects.length < filteredProjects.length;
     const showCreateCard = !keyword.trim() && projectFilter === "all";
     const selectedProjects = projects.filter((project) => selectedIds.includes(project.id));
-    const projectFilterLabel = projectFilter === "all" ? "全部画布" : projectFilter === "independent" ? "自由画布" : projectNames.get(projectFilter) || "项目画布";
-    const sortLabel = sort === "name" ? "按名称" : sort === "nodes" ? "按节点" : "最近更新";
-    const projectFilterItems = useMemo(() => [{ key: "all", label: "全部画布" }, { key: "independent", label: "自由画布" }, ...(projectQuery.data?.projects || []).map(({ project }) => ({ key: project.id, label: project.name }))], [projectQuery.data]);
+    const projectFilterLabel = projectFilter === "all" ? t("canvas.all") : projectFilter === "independent" ? t("canvas.independent") : projectNames.get(projectFilter) || t("canvas.project");
+    const sortLabel = sort === "name" ? t("canvas.byName") : sort === "nodes" ? t("canvas.byNodes") : t("canvas.recent");
+    const projectFilterItems = useMemo(() => [{ key: "all", label: t("canvas.all") }, { key: "independent", label: t("canvas.independent") }, ...(projectQuery.data?.projects || []).map(({ project }) => ({ key: project.id, label: project.name }))], [projectQuery.data, t]);
     const sortItems = [
-        { key: "updated", label: "最近更新", icon: <Clock3 className="size-3.5" /> },
-        { key: "name", label: "按名称", icon: <ArrowDownAZ className="size-3.5" /> },
-        { key: "nodes", label: "按节点数量", icon: <ListFilter className="size-3.5" /> },
+        { key: "updated", label: t("canvas.recent"), icon: <Clock3 className="size-3.5" /> },
+        { key: "name", label: t("canvas.byName"), icon: <ArrowDownAZ className="size-3.5" /> },
+        { key: "nodes", label: t("canvas.byNodes"), icon: <ListFilter className="size-3.5" /> },
     ];
     useEffect(() => {
         setLoadedProjectCount(50);
@@ -405,41 +407,41 @@ export default function CanvasPage() {
         <WorkspacePage grid className="canvas-library-page">
             <div className="studio-band">
                 <PageHeader
-                    title="画布"
-                    description="把镜头、素材和想法留在同一张画布里。"
-                    meta={<span className="app-projects-header-meta">{totalProjects} 个</span>}
+                    title={t("canvas.libraryTitle")}
+                    description={t("canvas.libraryDescription")}
+                    meta={<span className="app-projects-header-meta">{totalProjects} canvases</span>}
                     actions={
                         <div className="canvas-library-header-actions">
                             <Button className="canvas-library-header-action is-primary library-primary-action" type="primary" disabled={!hydrated} icon={<Plus className="size-3.5" />} onClick={createAndEnter}>
-                                新建画布
+                                {t("canvas.new")}
                             </Button>
                             {projects.length ? (
                                 <Dropdown
                                     menu={{
                                         classNames: { root: "canvas-library-actions-menu", item: "canvas-library-actions-menu-item" },
-                                        items: [{ key: "delete-loaded", danger: true, icon: <Trash2 className="size-3.5" />, label: "删除当前已加载画布", onClick: () => setDeleteIds(projects.map((project) => project.id)) }],
+                                        items: [{ key: "delete-loaded", danger: true, icon: <Trash2 className="size-3.5" />, label: "Delete loaded canvases", onClick: () => setDeleteIds(projects.map((project) => project.id)) }],
                                     }}
                                     openClassName="is-open"
                                     placement="bottomRight"
                                     trigger={["click"]}
                                 >
-                                    <Button className="canvas-library-header-action is-icon" aria-label="更多画布操作" title="更多操作" icon={<MoreHorizontal className="size-4" />} />
+                                    <Button className="canvas-library-header-action is-icon" aria-label="More canvas actions" title="More actions" icon={<MoreHorizontal className="size-4" />} />
                                 </Dropdown>
                             ) : null}
                             <Button className="canvas-library-header-action" disabled={!hydrated} icon={<FileUp className="size-3.5" />} onClick={() => inputRef.current?.click()}>
-                                导入
+                                Import
                             </Button>
                         </div>
                     }
                 />
 
-                <section className="canvas-library-discovery" aria-label="画布浏览工具">
+                <section className="canvas-library-discovery" aria-label="Canvas browsing tools">
                     <div className="canvas-library-search">
                         <Search aria-hidden="true" />
                         <input
                             value={keyword}
-                            placeholder="搜索画布"
-                            aria-label="搜索画布"
+                            placeholder={t("canvas.search")}
+                            aria-label={t("canvas.search")}
                             onChange={(event) => {
                                 setKeyword(event.target.value);
                             }}
@@ -447,7 +449,7 @@ export default function CanvasPage() {
                         {keyword ? (
                             <button
                                 type="button"
-                                aria-label="清除搜索"
+                                aria-label="Clear search"
                                 onClick={() => {
                                     setKeyword("");
                                 }}

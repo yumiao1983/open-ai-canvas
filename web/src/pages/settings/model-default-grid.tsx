@@ -34,6 +34,7 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
             {groups.map((group) => {
                 const models = filterModelsByCapability(config.models, group.capability, config.channels);
                 const Icon = group.icon;
+                const modelSections = group.capability === "audio" ? splitAudioModels(models) : [{ title: "", models }];
                 return (
                     <section key={group.capability} className="py-5 first:pt-0 last:pb-0" aria-labelledby={`default-${group.capability}-title`}>
                         <div className="mb-3 flex items-start gap-3">
@@ -45,8 +46,12 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
                             <span className="ml-auto shrink-0 text-xs tabular-nums text-foreground/38">{models.length} 个可用</span>
                         </div>
                         {models.length ? (
-                            <div role="radiogroup" aria-label={group.title} className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                {models.map((model) => {
+                            <div className="space-y-4">
+                                {modelSections.map((section) => (
+                                    <div key={section.title || group.capability}>
+                                        {section.title ? <p className="mb-2 text-xs font-medium text-foreground/60">{section.title}</p> : null}
+                                        <div role="radiogroup" aria-label={section.title || group.title} className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                {section.models.map((model) => {
                                     const channel = resolveModelChannel(config, model);
                                     const selected = config[group.modelKey] === model;
                                     const cost = channel.modelCosts?.find((item) => item.model === modelOptionName(model));
@@ -69,8 +74,9 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
                                                 <span className="min-w-0 flex-1">
                                                     <span className="block truncate text-xs font-semibold">{modelDisplayName(config, model)}</span>
                                                     <span className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[var(--fs-tiny)] text-foreground/45">
-                                                        <span className="max-w-full truncate">{channel.name || "未命名渠道"}</span>
+                                                        <span className="max-w-full truncate">{modelChannelLabel(channel.name, modelOptionName(model), group.capability)}</span>
                                                         <span className="model-default-option-scope">{channel.scope === "system" ? "系统" : "自定义"}</span>
+                                                        {group.capability === "audio" ? <span className="model-default-option-scope">{audioModelKind(modelOptionName(model))}</span> : null}
                                                         {creditsEnabled && cost ? <span className="model-default-price">{formatPrice(cost.billingMode === "token" ? (cost.outputTokenPriceMicrocredits || 0) : cost.unitPriceMicrocredits)} /{cost.billingMode === "token" ? "百万 Token" : cost.billingMode === "per_second" ? "秒" : "次"}</span> : null}
                                                     </span>
                                                 </span>
@@ -81,6 +87,9 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
                                         </button>
                                     );
                                 })}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : (
                             <div className="rounded-md bg-surface-active px-4 py-6 text-center text-xs text-foreground/45">当前渠道中没有可用的{capabilityLabel(group.capability)}模型</div>
@@ -90,6 +99,30 @@ export function ModelDefaultGrid({ config, onChange }: { config: AiConfig; onCha
             })}
         </div>
     );
+}
+
+function splitAudioModels(models: string[]) {
+    const sections = ["语音合成", "音乐生成", "音色复刻", "音色设计", "其他音频"];
+    return sections.map((title) => ({ title, models: models.filter((model) => audioModelKind(modelOptionName(model)) === title) })).filter((section) => section.models.length);
+}
+
+function audioModelKind(model: string) {
+    const normalized = model.toLowerCase();
+    if (normalized === "voice_clone") return "音色复刻";
+    if (normalized === "voice_design") return "音色设计";
+    if (normalized.startsWith("music-")) return "音乐生成";
+    if (normalized.startsWith("speech-") || normalized.includes("tts")) return "语音合成";
+    return "其他音频";
+}
+
+function modelChannelLabel(channelName: string, model: string, capability: ModelCapability) {
+    // A channel may have been named “MiniMax-文本” before media products were
+    // added. Its name should not make video or audio cards look misclassified.
+    if (/^(minimax-|speech-|music-|voice_(clone|design)$)/i.test(model)) {
+        const kind = capability === "audio" ? audioModelKind(model) : capability === "video" ? "视频生成" : "文本";
+        return `MiniMax · ${kind}`;
+    }
+    return channelName || "未命名渠道";
 }
 
 function capabilityLabel(capability: ModelCapability) {

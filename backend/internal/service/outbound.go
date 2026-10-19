@@ -322,7 +322,7 @@ func resolveCustomRelayHost(ctx context.Context, host string) ([]net.IP, error) 
 	if err != nil {
 		return nil, err
 	}
-	if !allowPrivateHost {
+	if !allowPrivateHost && !knownPublicProviderHost(host) {
 		for _, ip := range addresses {
 			if blockedCustomRelayIP(ip) {
 				return nil, BadAuthRequest("不允许访问保留地址或特殊用途地址")
@@ -330,6 +330,19 @@ func resolveCustomRelayHost(ctx context.Context, host string) ([]net.IP, error) 
 		}
 	}
 	return addresses, nil
+}
+
+// Some desktop proxy clients resolve well-known public API domains into their
+// local fake-IP range (198.18.0.0/15). Keep SSRF protection for arbitrary
+// hosts, but do not reject the exact HTTPS provider domains the product offers
+// as built-in connection presets.
+func knownPublicProviderHost(host string) bool {
+	switch normalizeOutboundHost(host) {
+	case "api.deepseek.com", "api.minimax.io", "api.minimaxi.com", "dashscope.aliyuncs.com", "open.bigmodel.cn", "generativelanguage.googleapis.com", "api.openai.com":
+		return true
+	default:
+		return false
+	}
 }
 
 func resolveOutboundHostWithPolicy(ctx context.Context, host string, allowPrivateHost bool) ([]net.IP, error) {

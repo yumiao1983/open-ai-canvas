@@ -38,16 +38,21 @@
 
 ## 本地协作文档（不随仓库分发）
 
-- [beautifului 创作设计](beautifului-creation-design.md)：本地设计参考，未纳入版本控制。
+- `beautifului-creation-design.md`：本地设计参考，未纳入版本控制，不作为仓库文档入口。
 
-## 按约定维护的文档（`docs/content/docs/`）
+## 按主题阅读（`docs/content/docs/`）
 
-功能、代码地图、待办、待测试分别维护在以下页面；尚未建立的专题会在对应任务中补齐：
+文档站按“认识影策、开发文档、画布、插件与 Agent、项目进度”分组。建议按下面顺序阅读：
 
-- [AI 审美批改画布插件](content/docs/plugins/ai-art-critique.mdx)
-- [功能](content/docs/overview/features.mdx)
-- [本地开发](content/docs/backend/local-development.mdx)
-- [后端数据库](content/docs/backend/backend-database.mdx)
-- [代码地图](content/docs/backend/code-map.mdx)
-- [待办](content/docs/progress/todo.mdx)
-- [待测试](content/docs/progress/pending-test.mdx)
+1. [快速开始](content/docs/overview/quick-start.mdx)：第一次运行和首次配置。
+2. [功能清单](content/docs/overview/features.mdx)：当前已经实现的用户能力。
+3. [架构概览](content/docs/overview/architecture.mdx)：前后端、任务、资源和 Agent 的数据流。
+4. [本地开发](content/docs/backend/local-development.mdx)：宿主机、whisper.cpp 和 Docker 开发。
+5. [代码地图](content/docs/backend/code-map.mdx)：修改代码前定位入口和边界。
+6. [部署与反向代理](content/docs/overview/docker.mdx)：Compose、生产安全和 SSE。
+7. [数据库结构](content/docs/backend/backend-database.mdx)：表、迁移和数据目录约束。
+8. [画布操作手册](content/docs/canvas/canvas-node-manual.mdx)：画布、生成、素材和 Agent 使用边界。
+9. [插件系统](content/docs/plugins/plugin-system.mdx)：插件运行时与扩展面。
+10. [待办](content/docs/progress/todo.mdx)与[待测试](content/docs/progress/pending-test.mdx)：尚未完成和已实现待确认内容。
+
+设计方案、ADR 和实施计划仍保留在 `docs/design/`、`docs/adr/` 和 `docs/plans/`，它们是决策与过程记录，不替代面向用户的专题文档。

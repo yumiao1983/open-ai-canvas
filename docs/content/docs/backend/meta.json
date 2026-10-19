@@ -8,8 +8,6 @@
     "backend-database",
     "task-runtime-stability",
     "newapi-channel-2",
-    "system-update",
-    "protocol-plugins",
-    "canvas-data-structure"
+    "system-update"
   ]
 }

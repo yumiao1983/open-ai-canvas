@@ -1,7 +1,7 @@
 import { App, Button, Input, InputNumber } from "antd";
 import { Select } from "@/components/ui/base/select";
 import { SettingsRow } from "@/components/ui/product/settings-row";
-import { ArrowLeft, Boxes, Bug, Cloud, MessageSquareText, MonitorUp, RadioTower, SlidersHorizontal, SquareTerminal, Workflow } from "lucide-react";
+import { ArrowLeft, Boxes, Bug, Cloud, Globe2, MessageSquareText, MonitorUp, RadioTower, SlidersHorizontal, SquareTerminal, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -10,7 +10,7 @@ import { audioFormatOptions, audioVoiceOptions, normalizeAudioSpeedValue } from 
 import { refreshSystemChannels } from "@/lib/user-session";
 import { defaultConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { ChannelSettingsPane, channelValidationError, focusInvalidChannelField, isChannelReady } from "./channel-settings-pane";
+import { ChannelSettingsPane, channelValidationError, focusInvalidChannelField, isChannelReady, normalizeMiniMaxChannels } from "./channel-settings-pane";
 export { UserLocalChannelFields, UserLocalChannelSwitch, userLocalChannelChangePatch, userLocalChannelFormOwner } from "./channel-settings-pane";
 import { ComfyUIBridgeSettingsPane } from "./comfyui-bridge-settings-pane";
 import { ModelDefaultGrid } from "./model-default-grid";
@@ -20,6 +20,8 @@ import DiagnosticsPanel from "./diagnostics-panel";
 import { RunningHubSettingsPane } from "./runninghub-settings-pane";
 import { COMFYUI_PLUGIN_ID, RUNNINGHUB_PLUGIN_ID } from "@/lib/plugins/builtin/workflows";
 import { usePluginStore } from "@/stores/use-plugin-store";
+import { useTranslation, type TranslationKey } from "@/i18n";
+import { useLocaleStore, type AppLocale } from "@/stores/use-locale-store";
 
 type ConfigSectionKey = "local-cli" | "channels" | "models" | "runninghub" | "comfyui" | "preferences" | "prompts" | "storage" | "diagnostics";
 
@@ -35,6 +37,18 @@ const configSections: Array<{ key: ConfigSectionKey; label: string; description:
     { key: "diagnostics", label: "问题诊断", description: "导出日志协助排查", icon: <Bug className="size-4" /> },
 ];
 
+const configSectionCopy: Record<ConfigSectionKey, readonly [TranslationKey, TranslationKey]> = {
+    "local-cli": ["settings.localTools", "settings.localToolsDescription"],
+    channels: ["settings.providers", "settings.providersDescription"],
+    models: ["settings.models", "settings.modelsDescription"],
+    runninghub: ["settings.runningHub", "settings.runningHubDescription"],
+    comfyui: ["settings.comfyUI", "settings.comfyUIDescription"],
+    preferences: ["settings.preferences", "settings.preferencesDescription"],
+    prompts: ["settings.prompts", "settings.promptsDescription"],
+    storage: ["settings.storage", "settings.storageDescription"],
+    diagnostics: ["settings.diagnostics", "settings.diagnosticsDescription"],
+};
+
 export function isConfigSection(value: string | null): value is ConfigSectionKey {
     return configSections.some((section) => section.key === value);
 }
@@ -42,6 +56,9 @@ export function isConfigSection(value: string | null): value is ConfigSectionKey
 export default function SettingsPage() {
     const { message } = App.useApp();
     const navigate = useNavigate();
+    const { t } = useTranslation();
+    const locale = useLocaleStore((state) => state.locale);
+    const setLocale = useLocaleStore((state) => state.setLocale);
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedSection = searchParams.get("section");
     const customChannelsEnabled = useUserStore((state) => state.features.customChannelsEnabled);
@@ -54,6 +71,7 @@ export default function SettingsPage() {
     const initialSection = isConfigSection(requestedSection) && requestedSectionEnabled ? requestedSection : customChannelsEnabled ? "channels" : "models";
     const [activeTab, setActiveTab] = useState<ConfigSectionKey>(initialSection === "channels" && !customChannelsEnabled ? "models" : initialSection);
     const config = useConfigStore((state) => state.config);
+    const replaceConfig = useConfigStore((state) => state.replaceConfig);
     const effectiveConfig = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const shouldPromptContinue = searchParams.get("continue") === "1";
@@ -62,6 +80,11 @@ export default function SettingsPage() {
     const visibleConfigSections = useMemo(() => (customChannelsEnabled ? configSections : configSections.filter((section) => section.key !== "channels"))
         .filter((section) => section.key !== "runninghub" || runningHubPluginEnabled)
         .filter((section) => section.key !== "comfyui" || comfyUIPluginEnabled), [comfyUIPluginEnabled, customChannelsEnabled, runningHubPluginEnabled]);
+
+    const localizedConfigSections = useMemo(() => visibleConfigSections.map((section) => {
+        const [label, description] = configSectionCopy[section.key];
+        return { ...section, label: t(label), description: t(description) };
+    }), [t, visibleConfigSections]);
 
     const isVisibleConfigSection = (value: string | null): value is ConfigSectionKey => isConfigSection(value) && visibleConfigSections.some((section) => section.key === value);
 
@@ -83,6 +106,13 @@ export default function SettingsPage() {
             cancelled = true;
         };
     }, [message, userId]);
+
+    // Apply the MiniMax product-directory migration regardless of which
+    // Settings section the user opens first.
+    useEffect(() => {
+        const migrated = normalizeMiniMaxChannels(config);
+        if (migrated) replaceConfig(migrated);
+    }, [config, replaceConfig]);
 
     const selectSection = (section: ConfigSectionKey) => {
         if ((section === "runninghub" && !runningHubPluginEnabled) || (section === "comfyui" && !comfyUIPluginEnabled)) return;
@@ -136,18 +166,32 @@ export default function SettingsPage() {
             <SettingsPane>
                 <div className="settings-pane-header">
                     <div className="min-w-0">
-                        <h2>生成偏好</h2>
-                        <p>画布、视频与音频默认值，节点内仍可单独覆盖。</p>
+                        <h2>{t("settings.preferences")}</h2>
+                        <p>{locale === "zh-CN" ? "管理工作区语言、画布、视频与音频默认值。" : "Manage workspace language and defaults for canvas, video, and audio."}</p>
                     </div>
                 </div>
                 <div className="settings-section">
                     <section className="settings-preference-block py-4">
-                        <div className="mb-3">
-                            <h3 className="text-[13px] font-medium text-foreground/60">画布生成</h3>
-                            <p className="mt-1 text-xs text-foreground/55">设置新建生成任务时使用的初始值，节点内仍可单独覆盖。</p>
+                        <div className="mb-3 flex items-start gap-2">
+                            <Globe2 className="mt-0.5 size-4 text-foreground/55" />
+                            <div>
+                                <h3 className="text-[13px] font-medium text-foreground/60">{t("settings.languageTitle")}</h3>
+                                <p className="mt-1 text-xs text-foreground/55">{t("language.description")}</p>
+                            </div>
                         </div>
                         <SettingsRow
-                            label="默认生图张数"
+                            label={t("language.label")}
+                            control={<Select value={locale} options={[{ value: "en-US", label: "English" }, { value: "zh-CN", label: "简体中文" }]} onChange={(value) => setLocale(value as AppLocale)} />}
+                            controlClassName="w-[200px]"
+                        />
+                    </section>
+                    <section className="settings-preference-block py-4">
+                        <div className="mb-3">
+                            <h3 className="text-[13px] font-medium text-foreground/60">{t("settings.generationTitle")}</h3>
+                            <p className="mt-1 text-xs text-foreground/55">{t("settings.generationDescription")}</p>
+                        </div>
+                        <SettingsRow
+                            label={t("settings.defaultImageCount")}
                             control={
                                 <InputNumber
                                     min={1}
@@ -163,13 +207,13 @@ export default function SettingsPage() {
                     </section>
                     <section className="settings-preference-block py-4">
                         <div className="mb-3">
-                            <h3 className="text-[13px] font-medium text-foreground/60">音频默认值</h3>
+                            <h3 className="text-[13px] font-medium text-foreground/60">{t("settings.audioDefaults")}</h3>
                             <p className="mt-1 text-xs text-foreground/55">用于新建音频节点和未单独设置参数的生成任务。</p>
                         </div>
-                        <SettingsRow label="默认声音" control={<Select value={config.audioVoice} options={audioVoiceOptions} onChange={(value) => updateConfig("audioVoice", value)} />} controlClassName="w-[200px]" />
-                        <SettingsRow label="文件格式" control={<Select value={config.audioFormat} options={audioFormatOptions} onChange={(value) => updateConfig("audioFormat", value)} />} controlClassName="w-[200px]" />
+                        <SettingsRow label={t("settings.defaultVoice")} control={<Select value={config.audioVoice} options={audioVoiceOptions} onChange={(value) => updateConfig("audioVoice", value)} />} controlClassName="w-[200px]" />
+                        <SettingsRow label={t("settings.fileFormat")} control={<Select value={config.audioFormat} options={audioFormatOptions} onChange={(value) => updateConfig("audioFormat", value)} />} controlClassName="w-[200px]" />
                         <SettingsRow
-                            label="语速"
+                            label={t("settings.speed")}
                             description="音频朗读速度（0.25–4）。"
                             control={
                                 <InputNumber
@@ -191,7 +235,7 @@ export default function SettingsPage() {
                             <p className="mt-1 text-xs text-foreground/55">在音频节点没有单独填写时使用。</p>
                         </div>
                         <SettingsRow
-                            label="默认音频指令"
+                            label={t("settings.audioInstructions")}
                             align="top"
                             control={<Input.TextArea rows={5} value={config.audioInstructions} placeholder="例如：自然、温暖、适合旁白。" onChange={(event) => updateConfig("audioInstructions", event.target.value)} />}
                             controlClassName="w-full max-w-[480px]"
@@ -220,14 +264,14 @@ export default function SettingsPage() {
                             <ArrowLeft className="size-4" />
                         </button>
                     ) : null}
-                    <h1 className="truncate text-sm font-semibold">设置</h1>
+                    <h1 className="truncate text-sm font-semibold">{t("settings.title")}</h1>
                 </div>
                 {shouldPromptContinue ? <Button type="primary" size="small" onClick={finishConfig}>保存并返回</Button> : null}
             </header>
             <div className="settings-library-frame flex min-h-0 flex-1 flex-col md:flex-row">
                 <aside className="settings-nav-panel w-full shrink-0 md:w-[200px]">
                     <nav className="thin-scrollbar flex gap-1 overflow-x-auto p-2 md:block md:space-y-1 md:p-2.5" aria-label="配置分类">
-                        {visibleConfigSections.map((item) => {
+                        {localizedConfigSections.map((item) => {
                             const selected = item.key === activeTab;
                             return (
                                 <button

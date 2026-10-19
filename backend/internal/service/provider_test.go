@@ -28,9 +28,9 @@ func TestProviderMediaHydrationPolicyPrefersObjectURLs(t *testing.T) {
 	if prefer.requireURL || !prefer.preferURL {
 		t.Fatalf("grok image policy = %#v", prefer)
 	}
-	required := providerMediaHydrationPolicyFor(context.Background(), canvasGenerationInput{Config: providerConfig{InterfaceType: string(model.ChannelInterfaceMiniMaxVideo)}})
-	if !required.requireURL || !required.preferURL {
-		t.Fatalf("minimax policy = %#v", required)
+	minimax := providerMediaHydrationPolicyFor(context.Background(), canvasGenerationInput{Config: providerConfig{InterfaceType: string(model.ChannelInterfaceMiniMaxVideo)}})
+	if minimax.requireURL || !minimax.preferURL {
+		t.Fatalf("minimax policy = %#v", minimax)
 	}
 	bytesOnly := providerMediaHydrationPolicyFor(context.Background(), canvasGenerationInput{Config: providerConfig{InterfaceType: string(model.ChannelInterfaceGeminiImage)}})
 	if bytesOnly.requireURL || bytesOnly.preferURL {

@@ -383,6 +383,14 @@ export function CanvasAssistantPanel({
         localActiveSessionIdRef.current = activeId;
         setLocalActiveSessionIdState(activeId);
     };
+    // 会话提交与后端流式回调会在同一渲染周期内连续读取会话。把 ref 与状态
+    // 同步更新，避免「新建对话」后的第一条消息仍写到上一个会话里而被丢弃。
+    const replaceLocalSessions = (next: CanvasAssistantSession[] | ((current: CanvasAssistantSession[]) => CanvasAssistantSession[])) => {
+        const resolved = typeof next === "function" ? next(localSessionsRef.current) : next;
+        localSessionsRef.current = resolved;
+        setLocalSessions(resolved);
+        return resolved;
+    };
     const applyingExternalSessionsRef = useRef(false);
     const chatListRef = useRef<HTMLDivElement>(null);
     const snapshotRef = useRef(snapshot);
@@ -408,8 +416,7 @@ export function CanvasAssistantPanel({
         if (!sessions.length) return;
         if (sessions === localSessions && activeSessionId === localActiveSessionId) return;
         applyingExternalSessionsRef.current = true;
-        localSessionsRef.current = sessions;
-        setLocalSessions(sessions);
+        replaceLocalSessions(sessions);
         setLocalActiveSessionId(activeSessionId);
     }, [activeSessionId, sessions]);
 
@@ -460,16 +467,14 @@ export function CanvasAssistantPanel({
 
     const updateSession = (sessionId: string, updater: (session: CanvasAssistantSession) => CanvasAssistantSession) => {
         const next = localSessionsRef.current.map((session) => (session.id === sessionId ? updater(session) : session));
-        localSessionsRef.current = next;
-        setLocalSessions(next);
+        replaceLocalSessions(next);
         return next;
     };
 
     const readCinematicSessionState = (): CinematicContinuationLiveSessionState => ({ sessions: localSessionsRef.current, activeChatId: localActiveSessionIdRef.current });
 
     const restoreCinematicSessions = (sessions: CanvasAssistantSession[], activeId: string | null) => {
-        localSessionsRef.current = sessions;
-        setLocalSessions(sessions);
+        replaceLocalSessions(sessions);
         setLocalActiveSessionId(activeId);
     };
     const restoreCinematicSnapshot = (state: Pick<CanvasAgentSnapshot, "nodes" | "connections">) => {
@@ -618,7 +623,7 @@ export function CanvasAssistantPanel({
             return;
         }
         const session = createSession();
-        setLocalSessions((prev) => [session, ...prev]);
+        replaceLocalSessions((prev) => [session, ...prev]);
         setLocalActiveSessionId(session.id);
     };
 
@@ -626,10 +631,10 @@ export function CanvasAssistantPanel({
         const next = safeSessions.filter((session) => !ids.includes(session.id));
         if (!next.length) {
             const session = createSession();
-            setLocalSessions([session]);
+            replaceLocalSessions([session]);
             setLocalActiveSessionId(session.id);
         } else {
-            setLocalSessions(next);
+            replaceLocalSessions(next);
             setLocalActiveSessionId(localActiveSessionId && ids.includes(localActiveSessionId) ? next[0].id : localActiveSessionId);
         }
         void cleanupImages({ sessions: next });
@@ -637,7 +642,7 @@ export function CanvasAssistantPanel({
 
     const clearSessions = () => {
         const session = createSession();
-        setLocalSessions([session]);
+        replaceLocalSessions([session]);
         setLocalActiveSessionId(session.id);
         void cleanupImages({ sessions: [session] });
     };
@@ -651,7 +656,7 @@ export function CanvasAssistantPanel({
 
         const session = activeSession || createSession();
         if (!activeSession) {
-            setLocalSessions([session]);
+            replaceLocalSessions([session]);
             setLocalActiveSessionId(session.id);
         }
 
@@ -937,7 +942,7 @@ export function CanvasAssistantPanel({
         }
         const session = activeSession || createSession();
         if (!activeSession) {
-            setLocalSessions([session]);
+            replaceLocalSessions([session]);
             setLocalActiveSessionId(session.id);
         }
         appendMessage(session.id, { id: nanoid(), role: "user", text: value });
@@ -983,6 +988,7 @@ export function CanvasAssistantPanel({
                 if (backendSessionId) failCinematicSession(session.id, backendSessionId, failure);
                 else appendMessage(session.id, { id: nanoid(), role: "error", title: "影视项目生成失败", text: failure instanceof Error ? failure.message : "影视项目生成失败" });
             });
+            setCinematicEntryActive(false);
         } finally {
             setIsRunning(false);
         }
@@ -1197,7 +1203,7 @@ export function CanvasAssistantPanel({
                 historyCount={agentMode === "online" ? historySessions.length : 0}
                 historyActive={agentMode === "online" && view === "history"}
                 onOpenHistory={agentMode === "online" ? () => setView((current) => current === "history" ? "chat" : "history") : undefined}
-                onNewChat={agentMode === "online" ? () => { startChatSession(); setView("chat"); } : undefined}
+                onNewChat={agentMode === "online" ? () => { setCinematicEntryActive(false); startChatSession(); setView("chat"); } : undefined}
                 newChatDisabled={false}
             />
             {agentMode === "local" ? <CanvasLocalAgentPanel embedded snapshot={snapshot} canUndoOps={canUndoOps} undoOpsCount={undoOpsCount} onApplyOps={onApplyOps} onUndoOps={onUndoOps} autoConnect={autoConnectLocal} /> : onlineContent}
@@ -1657,15 +1663,27 @@ function toolCallToResponseInput(call: ResponseToolCall): ResponseInputMessage {
 // 重试一次——auto 在思考模式下可用，对话与工具调用均不受影响。
 // 语义与 image.ts 对非 auto tool_choice 的兼容降级策略一致。
 const THINKING_MODE_TOOL_CHOICE_REJECTION = "不支持强制工具调用";
+const GENERIC_REQUEST_REJECTION = "模型服务拒绝了请求";
+
+function isDeepSeekRequest(config: AiConfig) {
+    return /(^|[.:/_-])deepseek([.:/_-]|$)/i.test(config.model)
+        || /^https:\/\/api\.deepseek\.com(?:\/|$)/i.test(config.baseUrl);
+}
 
 async function requestOnlineAgentModel(config: AiConfig, messages: ResponseInputMessage[], toolChoice: "auto" | "required", prompt: string, onDelta: (text: string) => void) {
     const submit = (choice: "auto" | "required") => runBackendToolGenerationTask({ prompt, config, messages, tools: ONLINE_AGENT_TOOLS, toolChoice: choice, onDelta });
     try {
         return await submit(toolChoice);
     } catch (error) {
-        if (toolChoice !== "required" || !(error instanceof Error) || !error.message.includes(THINKING_MODE_TOOL_CHOICE_REJECTION)) {
+        if (toolChoice !== "required" || !(error instanceof Error)) {
             throw error;
         }
+        // 后台任务会脱敏错误正文；DeepSeek 的具体 tool_choice 拒绝有时会被
+        // 投影成通用 400 文案。仅对 DeepSeek 的首个强制工具调用作一次 auto 降级，
+        // 既保留普通渠道的参数错误，又让推理模型可以完成纯文本回复。
+        const shouldRetryWithAutoToolChoice = error.message.includes(THINKING_MODE_TOOL_CHOICE_REJECTION)
+            || (isDeepSeekRequest(config) && error.message.includes(GENERIC_REQUEST_REJECTION));
+        if (!shouldRetryWithAutoToolChoice) throw error;
         return submit("auto");
     }
 }

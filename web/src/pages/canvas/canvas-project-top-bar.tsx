@@ -14,6 +14,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { CanvasMediaPerformanceMode, CanvasWorkspaceMode } from "@/types/canvas";
 import { CanvasShortcutsModal } from "./canvas-shortcuts-modal";
+import { useTranslation } from "@/i18n";
 
 type CanvasTopBarProps = {
     title: string;
@@ -81,6 +82,7 @@ export function CanvasTopBar({
     const { availableMicrocredits, refreshing } = useWalletBalance(user?.id, creditsEnabled);
     const titleRef = useRef<HTMLDivElement>(null);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
+    const { t } = useTranslation();
 
     const handleShortDramaGuideToggle = () => {
         shortDramaGuide?.onToggle();
@@ -103,36 +105,36 @@ export function CanvasTopBar({
         <>
             <div className="canvas-topbar pointer-events-none absolute left-0 right-0 top-0 z-[var(--z-toolbar)] flex h-[var(--canvas-topbar-h)] items-center justify-between px-4 sm:px-5">
                 <div className="canvas-topbar-cluster canvas-topbar-project-cluster pointer-events-auto flex min-w-0 items-center gap-2" style={dockStyle}>
-                    <CanvasTopBarTooltip label="打开画布菜单">
+                    <CanvasTopBarTooltip label={t("canvas.menu")}>
                         <Dropdown
                             trigger={["click"]}
                             menu={{
                                 items: [
-                                    { key: "home", icon: <Home className="size-4" />, label: <Link to="/">主页</Link> },
-                                    { key: "projects", icon: <LayoutGrid className="size-4" />, label: <Link to="/canvas">画布</Link> },
+                                    { key: "home", icon: <Home className="size-4" />, label: <Link to="/">{t("canvas.home")}</Link> },
+                                    { key: "projects", icon: <LayoutGrid className="size-4" />, label: <Link to="/canvas">Canvas</Link> },
                                     { type: "divider" },
-                                    { key: "new", icon: <Plus className="size-4" />, label: "新建画布", onClick: onCreateProject },
-                                    { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: "删除当前画布", onClick: onDeleteProject },
+                                    { key: "new", icon: <Plus className="size-4" />, label: t("canvas.newCanvas"), onClick: onCreateProject },
+                                    { key: "delete", danger: true, icon: <Trash2 className="size-4" />, label: t("canvas.deleteCanvas"), onClick: onDeleteProject },
                                     { type: "divider" },
-                                    { key: "import", icon: <Upload className="size-4" />, label: "导入素材", onClick: onImportImage },
-                                    { key: "search", icon: <Search className="size-4" />, label: <MenuLabel text="搜索节点" shortcut="⌘ F" />, onClick: onOpenSearch },
+                                    { key: "import", icon: <Upload className="size-4" />, label: t("canvas.importMedia"), onClick: onImportImage },
+                                    { key: "search", icon: <Search className="size-4" />, label: <MenuLabel text={t("canvas.findNodes")} shortcut="⌘ F" />, onClick: onOpenSearch },
                                     {
                                         key: "performance",
                                         icon: <Gauge className="size-4" />,
-                                        label: "媒体性能",
+                                        label: t("canvas.performance"),
                                         children: [
-                                            { key: "performance-auto", label: "自动性能", onClick: () => onMediaPerformanceModeChange("auto") },
-                                            { key: "performance-quality", label: "画质优先", onClick: () => onMediaPerformanceModeChange("quality") },
-                                            { key: "performance-fast", label: "性能优先", onClick: () => onMediaPerformanceModeChange("performance") },
+                                            { key: "performance-auto", label: t("canvas.auto"), onClick: () => onMediaPerformanceModeChange("auto") },
+                                            { key: "performance-quality", label: t("canvas.prioritizeQuality"), onClick: () => onMediaPerformanceModeChange("quality") },
+                                            { key: "performance-fast", label: t("canvas.prioritizeSpeed"), onClick: () => onMediaPerformanceModeChange("performance") },
                                         ],
                                     },
                                     { type: "divider" },
-                                    { key: "undo", disabled: !canUndo, icon: <Undo2 className="size-4" />, label: <MenuLabel text="撤销" shortcut="⌘ Z" />, onClick: onUndo },
-                                    { key: "redo", disabled: !canRedo, icon: <Redo2 className="size-4" />, label: <MenuLabel text="重做" shortcut="⌘ ⇧ Z / ⌘ Y" />, onClick: onRedo },
+                                    { key: "undo", disabled: !canUndo, icon: <Undo2 className="size-4" />, label: <MenuLabel text={t("canvas.undo")} shortcut="⌘ Z" />, onClick: onUndo },
+                                    { key: "redo", disabled: !canRedo, icon: <Redo2 className="size-4" />, label: <MenuLabel text={t("canvas.redo")} shortcut="⌘ ⇧ Z / ⌘ Y" />, onClick: onRedo },
                                 ],
                             }}
                         >
-                            <button type="button" className="canvas-topbar-action grid size-9 place-items-center rounded-full" style={{ color: theme.node.text }} aria-label="打开画布菜单">
+                            <button type="button" className="canvas-topbar-action grid size-9 place-items-center rounded-full" style={{ color: theme.node.text }} aria-label={t("canvas.menu")}>
                                 <Menu className="size-5" />
                             </button>
                         </Dropdown>
@@ -152,15 +154,15 @@ export function CanvasTopBar({
                                 }}
                                 className="h-8 w-auto min-w-12 max-w-[min(280px,42vw)] appearance-none border-0 bg-transparent p-0 text-left text-base font-semibold tracking-normal outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
                                 style={{ color: theme.node.text, caretColor: theme.accent.primary, border: 0, boxShadow: "none", outline: "none" }}
-                                aria-label="画布名称"
+                                aria-label={t("canvas.name")}
                             />
                         ) : (
                             <div className="canvas-topbar-title-row flex min-w-0 items-center gap-0.5">
-                                <button type="button" className="min-w-0 flex-1 truncate text-left text-base font-semibold tracking-normal transition-opacity hover:opacity-75" onClick={onStartTitleEditing} title="点击修改画布名称">
+                                <button type="button" className="min-w-0 flex-1 truncate text-left text-base font-semibold tracking-normal transition-opacity hover:opacity-75" onClick={onStartTitleEditing} title={t("canvas.rename")}>
                                     {title}
                                 </button>
-                                <CanvasTopBarTooltip label="重命名画布">
-                                    <button type="button" className="canvas-topbar-action grid size-7 shrink-0 place-items-center rounded-md opacity-60 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2" style={{ color: theme.node.text }} onClick={onStartTitleEditing} aria-label="重命名画布">
+                                <CanvasTopBarTooltip label={t("canvas.rename")}>
+                                    <button type="button" className="canvas-topbar-action grid size-7 shrink-0 place-items-center rounded-md opacity-60 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2" style={{ color: theme.node.text }} onClick={onStartTitleEditing} aria-label={t("canvas.rename")}>
                                         <Pencil className="size-3.5" />
                                     </button>
                                 </CanvasTopBarTooltip>
@@ -168,15 +170,15 @@ export function CanvasTopBar({
                         )}
                         {projectContext && !isTitleEditing ? (
                             <div className="canvas-topbar-project-context mt-0.5 flex w-full min-w-0 items-center gap-1.5 overflow-hidden text-[var(--fs-tiny)]" style={{ color: theme.node.muted }}>
-                                <Link to={`/projects/${projectContext.projectId}/overview`} className="inline-flex min-w-0 items-center gap-1 hover:underline" title={`返回项目：${projectContext.projectName}`}>
+                                <Link to={`/projects/${projectContext.projectId}/overview`} className="inline-flex min-w-0 items-center gap-1 hover:underline" title={`Back to ${projectContext.projectName}`}>
                                     <FolderKanban className="size-3 shrink-0" />
                                     <span className="max-w-[120px] truncate">{projectContext.projectName}</span>
                                 </Link>
                                 <span aria-hidden>·</span>
-                                <button type="button" className="min-w-0 truncate hover:underline" onClick={onOpenSearch} title="搜索并定位章节或镜头">
-                                    {projectContext.chapterLabel || `${projectContext.nodeCount} 个节点`}
+                                <button type="button" className="min-w-0 truncate hover:underline" onClick={onOpenSearch} title="Find a chapter or shot">
+                                    {projectContext.chapterLabel || `${projectContext.nodeCount} nodes`}
                                     {projectContext.shotLabel ? ` · ${projectContext.shotLabel}` : ""}
-                                    {projectContext.selectedCount ? ` · 已选 ${projectContext.selectedCount}` : ""}
+                                    {projectContext.selectedCount ? ` · ${projectContext.selectedCount} selected` : ""}
                                 </button>
                             </div>
                         ) : null}
@@ -184,26 +186,26 @@ export function CanvasTopBar({
                 </div>
 
                 <div className="canvas-topbar-cluster pointer-events-auto flex items-center gap-1.5" style={dockStyle}>
-                    <CanvasTopBarTooltip label="搜索画布节点">
-                        <Button type="text" className="canvas-topbar-action !hidden !h-10 !w-10 !min-w-10 !rounded-xl !p-0 lg:!inline-flex" style={{ color: theme.node.text }} icon={<Search className="size-4" />} onClick={onOpenSearch} aria-label="搜索画布节点" />
+                    <CanvasTopBarTooltip label={t("canvas.findNodes")}>
+                        <Button type="text" className="canvas-topbar-action !hidden !h-10 !w-10 !min-w-10 !rounded-xl !p-0 lg:!inline-flex" style={{ color: theme.node.text }} icon={<Search className="size-4" />} onClick={onOpenSearch} aria-label={t("canvas.findNodes")} />
                     </CanvasTopBarTooltip>
-                    <CanvasTopBarTooltip label="导入第三方画布">
+                    <CanvasTopBarTooltip label={t("canvas.importExternal")}>
                         <Dropdown
                             trigger={["click"]}
                             placement="bottomRight"
                             menu={{
                                 items: [
-                                    { key: "libtv", icon: <CopyPlus className="size-4" />, label: "导入 LibTV 画布", onClick: onImportLibTV },
-                                    { key: "tapnow", icon: <CloudDownload className="size-4" />, label: "导入 TapNow 画布", onClick: onImportTapNow },
+                                    { key: "libtv", icon: <CopyPlus className="size-4" />, label: t("canvas.importLibTV"), onClick: onImportLibTV },
+                                    { key: "tapnow", icon: <CloudDownload className="size-4" />, label: t("canvas.importTapNow"), onClick: onImportTapNow },
                                 ],
                             }}
                         >
-                            <Button type="text" className="canvas-topbar-action canvas-topbar-import-button !h-10 !rounded-xl !px-2.5 !font-medium" style={{ color: theme.node.text }} icon={<CloudDownload className="size-4" />} aria-label="导入第三方画布">
-                                <span className="hidden lg:inline">导入第三方画布</span>
+                            <Button type="text" className="canvas-topbar-action canvas-topbar-import-button !h-10 !rounded-xl !px-2.5 !font-medium" style={{ color: theme.node.text }} icon={<CloudDownload className="size-4" />} aria-label={t("canvas.importExternal")}>
+                                <span className="hidden lg:inline">{t("canvas.import")}</span>
                             </Button>
                         </Dropdown>
                     </CanvasTopBarTooltip>
-                    <CanvasTopBarTooltip label="媒体性能模式">
+                    <CanvasTopBarTooltip label={t("canvas.performance")}>
                         <Dropdown
                             trigger={["click"]}
                             menu={{
@@ -211,56 +213,56 @@ export function CanvasTopBar({
                                 selectedKeys: [mediaPerformanceMode],
                                 onClick: ({ key }) => onMediaPerformanceModeChange(key as CanvasMediaPerformanceMode),
                                 items: [
-                                    { key: "auto", label: "自动性能" },
-                                    { key: "quality", label: "画质优先" },
-                                    { key: "performance", label: "性能优先" },
+                                    { key: "auto", label: t("canvas.auto") },
+                                    { key: "quality", label: t("canvas.prioritizeQuality") },
+                                    { key: "performance", label: t("canvas.prioritizeSpeed") },
                                 ],
                             }}
                         >
-                            <Button type="text" className="canvas-topbar-action !hidden !h-10 !w-10 !min-w-10 !rounded-xl !p-0 lg:!inline-flex" style={{ color: theme.node.text }} icon={<Gauge className="size-4" />} aria-label="媒体性能模式" />
+                            <Button type="text" className="canvas-topbar-action !hidden !h-10 !w-10 !min-w-10 !rounded-xl !p-0 lg:!inline-flex" style={{ color: theme.node.text }} icon={<Gauge className="size-4" />} aria-label="Media performance" />
                         </Dropdown>
                     </CanvasTopBarTooltip>
                     {compactAgentStatus ? <CompactAgentStatus status={compactAgentStatus} onClick={onToggleAgent} /> : null}
                     {user && creditsEnabled ? (
-                        <CanvasTopBarTooltip label="查看积分明细">
+                    <CanvasTopBarTooltip label={t("canvas.usage")}>
                             <Link
                                 to="/wallet"
                                 className="canvas-topbar-action inline-flex h-9 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-medium tabular-nums"
                                 style={{ color: theme.node.text }}
-                                aria-label="查看积分明细"
+                                aria-label={t("canvas.usage")}
                             >
                                 {refreshing && availableMicrocredits === null ? <LoaderCircle className="size-3.5 animate-spin opacity-60" /> : <Coins className="size-3.5" />}
                                 <span>{availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 3 })}</span>
                             </Link>
                         </CanvasTopBarTooltip>
                     ) : null}
-                    <CanvasTopBarTooltip label="进入专注模式（Shift + Ctrl/Cmd + F）">
+                    <CanvasTopBarTooltip label={`${t("canvas.focus")} (Shift + Ctrl/Cmd + F)`}>
                         <Button
                             type="text"
                             className="canvas-topbar-action !h-10 !w-10 !min-w-10 !rounded-xl !p-0"
                             style={{ color: theme.node.text }}
                             icon={<Focus className="size-4" />}
                             onClick={onEnterFocusMode}
-                            aria-label="进入专注模式"
+                            aria-label={t("canvas.focus")}
                         />
                     </CanvasTopBarTooltip>
                     {shortDramaGuide ? (
-                        <CanvasTopBarTooltip label={shortDramaGuide.collapsed ? "展开短剧流程" : "收起短剧流程"}>
+                    <CanvasTopBarTooltip label={shortDramaGuide.collapsed ? "Expand story flow" : "Collapse story flow"}>
                             <Button
                                 type="text"
                                 className="canvas-topbar-action !h-10 !rounded-xl !px-2.5 !font-medium"
                                 style={{ color: theme.node.text, background: shortDramaGuide.collapsed ? undefined : theme.toolbar.activeBg }}
                                 icon={<Clapperboard className="size-4" />}
                                 onClick={handleShortDramaGuideToggle}
-                                aria-label="短剧流程"
+                                aria-label="Story flow"
                                 aria-pressed={!shortDramaGuide.collapsed}
                             >
                                 <span className="tabular-nums">{shortDramaGuide.progress.completedCount}/5</span>
                             </Button>
                         </CanvasTopBarTooltip>
                     ) : null}
-                    <CanvasTopBarTooltip label="分享画布">
-                        <Button type="text" className="canvas-topbar-action !h-10 !w-10 !min-w-10 !rounded-xl !p-0" style={{ color: theme.node.text }} icon={<Share2 className="size-4" />} onClick={onShare} aria-label="分享画布" />
+                    <CanvasTopBarTooltip label={t("canvas.share")}>
+                        <Button type="text" className="canvas-topbar-action !h-10 !w-10 !min-w-10 !rounded-xl !p-0" style={{ color: theme.node.text }} icon={<Share2 className="size-4" />} onClick={onShare} aria-label={t("canvas.share")} />
                     </CanvasTopBarTooltip>
                     <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
                     <Button
@@ -271,7 +273,7 @@ export function CanvasTopBar({
                         onClick={onToggleAgent}
                         aria-pressed={agentOpen}
                     >
-                        Agent
+                        {t("canvas.agent")}
                     </Button>
                 </div>
             </div>
@@ -284,6 +286,7 @@ export function CanvasWorkspaceModeSwitch({ mode, onChange }: { mode: CanvasWork
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const reducedMotion = useReducedMotion();
     const simple = mode === "simple";
+    const { t } = useTranslation();
     const rootRef = useRef<HTMLDivElement>(null);
     const [open, setOpen] = useState(false);
 
@@ -319,13 +322,13 @@ export function CanvasWorkspaceModeSwitch({ mode, onChange }: { mode: CanvasWork
                 style={{ ...canvasDockStyle(theme, theme.node.text), background: open ? "var(--dock-command-active)" : "var(--dock-surface)", outlineColor: theme.accent.primary }}
                 aria-haspopup="listbox"
                 aria-expanded={open}
-                aria-label={`当前为${simple ? "简洁" : "专业"}模式，点击切换`}
+                aria-label={`Current mode: ${simple ? t("canvas.simpleMode") : t("canvas.proMode")}. Click to switch.`}
                 onClick={() => setOpen((value) => !value)}
             >
                 <span className="grid size-6 shrink-0 place-items-center rounded-full" style={{ background: theme.toolbar.itemHover, color: theme.accent.primary }}>
                     {simple ? <Sparkles className="size-3" /> : <Settings2 className="size-3" />}
                 </span>
-                <span className="min-w-0 flex-1 whitespace-nowrap text-[var(--fs-caption)] font-semibold leading-none">{simple ? "简洁模式" : "专业模式"}</span>
+                <span className="min-w-0 flex-1 whitespace-nowrap text-[var(--fs-caption)] font-semibold leading-none">{simple ? t("canvas.simpleMode") : t("canvas.proMode")}</span>
                 <motion.span animate={{ rotate: open ? 180 : 0 }} transition={reducedMotion ? { duration: 0 } : aceternityMotion.spring.dock} className="grid size-4 place-items-center" style={{ color: theme.node.muted }}>
                     <ChevronDown className="size-3" />
                 </motion.span>
@@ -336,7 +339,7 @@ export function CanvasWorkspaceModeSwitch({ mode, onChange }: { mode: CanvasWork
                     {open ? (
                         <motion.div
                             role="listbox"
-                            aria-label="选择画布工作模式"
+                            aria-label="Choose canvas mode"
                             initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.92 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.95 }}
@@ -344,8 +347,8 @@ export function CanvasWorkspaceModeSwitch({ mode, onChange }: { mode: CanvasWork
                             className="canvas-mode-switch-menu aceternity-floating-panel w-full overflow-hidden rounded-[var(--r-lg)] p-1.5 backdrop-blur-2xl"
                             style={{ ...canvasDockStyle(theme, theme.node.text), background: "var(--dock-surface)" }}
                         >
-                            <ModeOption active={simple} motionEnabled={!reducedMotion} icon={<Sparkles className="size-4" />} title="简洁模式" description="保留核心创作路径，降低参数密度" theme={theme} onClick={() => selectMode("simple")} />
-                            <ModeOption active={!simple} motionEnabled={!reducedMotion} icon={<Settings2 className="size-4" />} title="专业模式" description="显示完整节点、导演台与生成控制" theme={theme} onClick={() => selectMode("professional")} />
+                            <ModeOption active={simple} motionEnabled={!reducedMotion} icon={<Sparkles className="size-4" />} title={t("canvas.simpleMode")} description="Focus on the essential creative flow." theme={theme} onClick={() => selectMode("simple")} />
+                            <ModeOption active={!simple} motionEnabled={!reducedMotion} icon={<Settings2 className="size-4" />} title="Pro mode" description="Use every node, the director workspace, and generation control." theme={theme} onClick={() => selectMode("professional")} />
                         </motion.div>
                     ) : null}
                 </AnimatePresence>
@@ -396,13 +399,13 @@ function MenuLabel({ text, shortcut }: { text: string; shortcut: string }) {
 }
 
 function canvasTitleInputSize(value: string) {
-    const visualLength = Array.from(value || "画布名称").reduce((length, character) => length + (character.codePointAt(0)! > 0xff ? 2 : 1), 0);
+    const visualLength = Array.from(value || "Canvas name").reduce((length, character) => length + (character.codePointAt(0)! > 0xff ? 2 : 1), 0);
     return Math.min(30, Math.max(5, visualLength));
 }
 
 function CompactAgentStatus({ status, onClick }: { status: { connected: boolean; enabled: boolean; activity: string }; onClick: () => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
-    const label = status.connected ? "已连接到本地 Codex" : status.enabled ? status.activity || "连接中" : "正在连接本地 Codex";
+    const label = status.connected ? "Local Codex connected" : status.enabled ? status.activity || "Connecting" : "Connecting to local Codex";
     const dotColor = status.connected ? "#22c55e" : status.enabled ? "#f59e0b" : theme.node.muted;
-    return <CanvasTopBarTooltip label="打开本地 Codex 面板"><button type="button" className="canvas-topbar-action flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium" style={{ background: "transparent", color: theme.node.text }} onClick={onClick} aria-label="打开本地 Codex 面板"><span className="size-2 rounded-full" style={{ background: dotColor }} /><span className="max-w-[180px] truncate">{label}</span></button></CanvasTopBarTooltip>;
+    return <CanvasTopBarTooltip label="Open local Codex panel"><button type="button" className="canvas-topbar-action flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium" style={{ background: "transparent", color: theme.node.text }} onClick={onClick} aria-label="Open local Codex panel"><span className="size-2 rounded-full" style={{ background: dotColor }} /><span className="max-w-[180px] truncate">{label}</span></button></CanvasTopBarTooltip>;
 }

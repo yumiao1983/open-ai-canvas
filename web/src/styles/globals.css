@@ -76,7 +76,7 @@
     --fs-nano: 7px;         /* 纳米标注（角标计数、节点预览、% 后缀）*/
     --fs-micro: 9px;        /* 极小标注（分镜行号辅助）*/
     --fs-tiny: 10px;        /* 小标注（徽章、tag）*/
-    --fs-label: 11px;       /* 标签文字 */
+    --fs-label: 13px;       /* Readable workspace labels */
     --fs-caption: 12px;     /* 说明文字 */
     --fs-body: 14px;        /* 正文（基准）*/
     --fs-body-lg: 15px;     /* 大正文 */
@@ -561,13 +561,17 @@
     --workspace-accent-soft: rgba(17, 17, 17, 0.07);
     --workspace-nav-active-bg: color-mix(in srgb, var(--workspace-accent) 12%, transparent);
     --workspace-nav-active-hover-bg: color-mix(in srgb, var(--workspace-accent) 16%, transparent);
-    --workspace-sidebar-width: 208px;        /* 侧栏展开宽度：较原 260px 收窄 20% */
-    --workspace-sidebar-nav-width: 208px;    /* 展开态导航内容宽度 */
+    --workspace-sidebar-width: 240px;
+    --workspace-sidebar-nav-width: 240px;
     --workspace-sidebar-collapsed-width: 56px; /* 折叠态保留可发现的图标菜单轨 */
+    --studio-navigation: #f7f5f2;
+    --studio-canvas: #efede9;
+    --studio-accent: #bc6325;
+    --studio-accent-soft: rgba(188, 99, 37, 0.12);
 
-    --workspace-shell-gutter: 6px;        /* 工作区外壳画布留白与卡片间隙（组件 token）*/
+    --workspace-shell-gutter: 0px;
 
-    --workspace-card-gap: 4px;       /* 侧边栏与主区卡片之间间隙（组件 token）*/
+    --workspace-card-gap: 0px;
 
     /* --- Semantic 层（引用 Primitive，随主题切换）--- */
     /* 通用语义色（引用 Primitive neutral 色板）*/
@@ -623,9 +627,9 @@
 
     /* 编辑器工作台：圆角浮卡舞台底色 + 常亮强调色（明暗两主题同值，避免 workspace-accent 黑白反转）*/
     --director-workspace-bg: #0b0d0f;
-    --director-accent: #4f8cff;
-    --director-accent-hover: #6ba0ff;
-    --director-on-accent: #ffffff;
+    --director-accent: #d88a42;
+    --director-accent-hover: #e6a35b;
+    --director-on-accent: #1a120c;
     --director-success: #34d399;
     --director-warning: #fbbf24;
     --director-danger: #f87171;
@@ -725,6 +729,10 @@
     --workspace-accent-soft: rgba(255, 255, 255, 0.09);
     --workspace-nav-active-bg: color-mix(in srgb, var(--workspace-accent) 13%, transparent);
     --workspace-nav-active-hover-bg: color-mix(in srgb, var(--workspace-accent) 18%, transparent);
+    --studio-navigation: #121316;
+    --studio-canvas: #0a0b0d;
+    --studio-accent: #e5a15d;
+    --studio-accent-soft: rgba(229, 161, 93, 0.15);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
@@ -786,9 +794,9 @@
 
     /* 编辑器工作台：圆角浮卡舞台底色 + 常亮强调色（明暗两主题同值，避免 workspace-accent 黑白反转）*/
     --director-workspace-bg: #0b0d0f;
-    --director-accent: #4f8cff;
-    --director-accent-hover: #6ba0ff;
-    --director-on-accent: #ffffff;
+    --director-accent: #d88a42;
+    --director-accent-hover: #e6a35b;
+    --director-on-accent: #1a120c;
     --director-success: #34d399;
     --director-warning: #fbbf24;
     --director-danger: #f87171;
@@ -1519,7 +1527,7 @@
     .app-workspace-shell {
         position: relative;
         padding: var(--workspace-shell-gutter);
-        background: var(--workspace-page);
+        background: var(--studio-canvas);
     }
 
     /* 画布编辑器与运营后台（hideChrome 契约）：保持全屏连体，不套圆角卡片 */
@@ -1543,7 +1551,9 @@
 
     .app-workspace-sidebar {
         width: var(--workspace-sidebar-width, 208px);
-        background: color-mix(in srgb, var(--workspace-sidebar) 96%, var(--foreground) 4%);
+        background: var(--studio-navigation);
+        border-right: 1px solid var(--workspace-border);
+        border-radius: 0;
         transition: width var(--motion-state) var(--ease-aceternity);
     }
 
@@ -1626,12 +1636,12 @@
     .app-workspace-stage,
     .app-user-content,
     .app-workspace-grid {
-        background: var(--workspace-content);
+        background: var(--studio-canvas);
     }
 
 
     .app-workspace-page {
-        background: var(--workspace-content);
+        background: var(--studio-canvas);
     }
 
     .app-workspace-navigation {
@@ -1656,19 +1666,19 @@
     }
 
     .canvas-topbar {
-        background: transparent;
-        border-bottom: 0;
-        backdrop-filter: none;
+        background: var(--studio-navigation);
+        border-bottom: 1px solid var(--workspace-border);
+        backdrop-filter: blur(16px);
     }
 
     .canvas-topbar-cluster {
         min-height: var(--space-10);
         border: 0;
-        border-radius: var(--r-lg);
-        background: var(--dock-surface);
+        border-radius: var(--r-md);
+        background: transparent;
         padding: var(--space-half) var(--space-2);
-        box-shadow: var(--elevation-overlay);
-        backdrop-filter: blur(var(--dock-blur)) saturate(var(--glass-saturate));
+        box-shadow: none;
+        backdrop-filter: none;
     }
 
     /* 顶部操作区复用底部 FloatingDock 的命令状态，保持两组浮层在不同主题下有同一套反馈。 */
@@ -1743,10 +1753,10 @@
     .app-workspace-topbar {
         position: relative;
         z-index: var(--z-toolbar);
-        height: 44px;
-        border: 0;
+        height: 60px;
+        border-bottom: 1px solid var(--workspace-border);
         border-radius: 0;
-        background: transparent;
+        background: var(--studio-navigation);
         box-shadow: none;
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
@@ -1805,14 +1815,14 @@
 
     /* 侧栏激活项只保留底色高亮，不使用左侧竖条（用户决策：选中不画竖线）。 */
     .app-workspace-nav-link.is-active {
-        background: var(--workspace-nav-active-bg);
+        background: var(--studio-accent-soft);
         color: var(--foreground);
-        box-shadow: none;
+        box-shadow: inset 2px 0 0 var(--studio-accent);
     }
 
 
     .app-workspace-nav-link.is-active:hover {
-        background: var(--workspace-nav-active-hover-bg);
+        background: color-mix(in srgb, var(--studio-accent-soft) 140%, transparent);
     }
 
 

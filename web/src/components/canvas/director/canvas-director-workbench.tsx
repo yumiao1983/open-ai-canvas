@@ -16,7 +16,8 @@ import { compileDirectorPrompt } from "@/lib/canvas/director/director-prompt-com
 import { advanceDirectorPlayhead, resolveDirectorCameraAlignment, resolveDirectorCameraMoveKeyframes, resolveDirectorKeyframeRecord, resolveDirectorObjectTransformEdit, snapDirectorTime } from "@/lib/canvas/director/director-animation-semantics";
 import { createDirectorTransaction, installDirectorTerminalListeners, type DirectorTransaction } from "@/lib/canvas/director/director-gesture-transaction";
 import { recordDirectorDiagnostic } from "@/lib/canvas/director/director-diagnostics-recorder";
-import { DIRECTOR_MODES, directorModeCapabilities, type DirectorModeCapabilities } from "@/lib/canvas/director/director-modes";
+import { DIRECTOR_MODE_KEYS, directorModeCapabilities, type DirectorModeCapabilities } from "@/lib/canvas/director/director-modes";
+import { useTranslation } from "@/i18n";
 import { resolveDirectorPlacement, resolveDirectorPlacementAnchor } from "@/lib/canvas/director/director-placement";
 import { isDirectorOutputSnapshotCurrent, shouldReinitializeDirectorSession } from "@/lib/canvas/director/director-session";
 import { blocksDirectorShortcut, releaseDirectorFocusAfterPointer, resolveDirectorShortcut, type DirectorShortcutAction } from "@/lib/canvas/director/director-shortcuts";
@@ -33,6 +34,7 @@ import type { DirectorCamera, DirectorCameraMove, DirectorHumanoidBone, Director
 
 export function CanvasDirectorWorkbench({ open, scene, imageNodes, onboardingScope, onClose, onChange, onApply, onDeleteImageNode, onFlush }: { open: boolean; scene: DirectorScene | null; imageNodes: CanvasNodeData[]; onboardingScope: string; onClose: () => void; onChange: (scene: DirectorScene) => void; onApply: (output: DirectorSceneOutput) => Promise<void>; onDeleteImageNode: (nodeId: string) => void; onFlush?: () => void | Promise<void> }) {
     const { message, modal } = App.useApp();
+    const { t } = useTranslation();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const viewportRef = useRef<DirectorViewportHandle>(null);
     const modelInputRef = useRef<HTMLInputElement>(null);
@@ -692,29 +694,29 @@ export function CanvasDirectorWorkbench({ open, scene, imageNodes, onboardingSco
     return (
         <div data-canvas-no-zoom className="fixed inset-0 z-[var(--z-toast)] flex min-h-0 flex-col overflow-hidden" style={{ background: theme.canvas.background, color: theme.node.text }}>
             <header className="thin-scrollbar flex h-12 shrink-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b px-2" style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border }}>
-                <IconButton label="关闭导演台" onClick={closeWorkbench}><X className="size-4" /></IconButton>
+                <IconButton label="Close director workspace" onClick={closeWorkbench}><X className="size-4" /></IconButton>
                 <Input variant="borderless" value={draft.title} className="max-w-56 font-medium" onChange={(event) => replaceWithoutHistory((current) => ({ ...current, title: event.target.value }))} />
                 <span className="h-5 w-px" style={{ background: theme.toolbar.border }} />
-                <IconButton label="撤销" disabled={!history.length} onClick={undo}><Undo2 className="size-4" /></IconButton>
-                <IconButton label="重做" disabled={!future.length} onClick={redo}><Redo2 className="size-4" /></IconButton>
+                <IconButton label="Undo" disabled={!history.length} onClick={undo}><Undo2 className="size-4" /></IconButton>
+                <IconButton label="Redo" disabled={!future.length} onClick={redo}><Redo2 className="size-4" /></IconButton>
                 <span className="h-5 w-px" style={{ background: theme.toolbar.border }} />
                 {/* 一级模式切换：小屏也必须可达，因此不加 max-lg:hidden。 */}
-                <nav className="director-mode-switch" aria-label="导演台模式">
-                    {DIRECTOR_MODES.map((item) => (
+                <nav className="director-mode-switch" aria-label="Director workspace mode">
+                    {DIRECTOR_MODE_KEYS.map((item) => (
                         <button
                             key={item.mode}
                             type="button"
                             data-mode={item.mode}
                             className={`director-mode-switch-button ${mode === item.mode ? "is-active" : ""}`}
                             aria-pressed={mode === item.mode}
-                            title={item.hint}
+                            title={t(item.hint)}
                             onClick={(event) => {
                                 setMode(item.mode);
                                 // 焦点留在模式按钮上会让守卫吃掉 W/E/R/Delete。
                                 releaseDirectorFocusAfterPointer(event);
                             }}
                         >
-                            {item.label}
+                            {t(item.label)}
                         </button>
                     ))}
                 </nav>
@@ -726,43 +728,43 @@ export function CanvasDirectorWorkbench({ open, scene, imageNodes, onboardingSco
                     >
                         {saveIndicator.label}
                     </span>
-                    {saveIndicator.retryable ? <Button size="small" icon={<RotateCcw className="size-3.5" />} loading={retrying || saveIndicator.busy} onClick={() => void retrySave()}>重试保存</Button> : null}
+                    {saveIndicator.retryable ? <Button size="small" icon={<RotateCcw className="size-3.5" />} loading={retrying || saveIndicator.busy} onClick={() => void retrySave()}>Retry save</Button> : null}
                 </div>
                 <div className="flex items-center gap-1">
-                    {onboardingScope ? <IconButton label="重新开始引导" onClick={() => setOnboardingRestartSignal((value) => value + 1)}><Lightbulb className="size-4" /></IconButton> : null}
+                    {onboardingScope ? <IconButton label="Restart guide" onClick={() => setOnboardingRestartSignal((value) => value + 1)}><Lightbulb className="size-4" /></IconButton> : null}
                     <Select size="small" value={renderMode} className="w-24" options={renderModeOptions} onChange={setRenderMode} />
-                    <Button size="small" icon={<Video className="size-3.5" />} loading={recording} onClick={() => void exportClayVideo()}>导出白膜</Button>
-                    <Button size="small" type="primary" icon={<Save className="size-3.5" />} loading={saving} onClick={() => void applyToCanvas()}>应用到镜头</Button>
+                    <Button size="small" icon={<Video className="size-3.5" />} loading={recording} onClick={() => void exportClayVideo()}>Export clay video</Button>
+                    <Button size="small" type="primary" icon={<Save className="size-3.5" />} loading={saving} onClick={() => void applyToCanvas()}>Apply to shot</Button>
                 </div>
             </header>
 
             <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_292px] max-lg:grid-cols-[180px_minmax(0,1fr)]">
                 <aside className="thin-scrollbar min-h-0 overflow-y-auto border-r" style={{ background: theme.node.panel, borderColor: theme.toolbar.border }}>
-                    <PanelTitle title="场景对象" action={<AddMenuButton label="添加场景对象" items={addObjectMenuItems} />} />
+                    <PanelTitle title="Scene objects" action={<AddMenuButton label="Add scene object" items={addObjectMenuItems} />} />
                     <div className="px-2 pb-2">
                         {draft.objects.map((object) => <SceneRow key={object.id} active={selectedObjectId === object.id} icon={object.kind === "actor" || object.primitive === "character" ? <UserRound /> : object.kind === "model" ? <BoxSelect /> : object.kind === "billboard" ? <ImageIcon /> : <Cuboid />} label={object.name} onClick={() => setSelectedObjectId(object.id)} onDelete={() => removeObject(object.id)} />)}
                     </div>
-                    <PanelTitle title="摄影机" action={<AddMenuButton label="添加摄影机" items={addCameraMenuItems} />} />
+                    <PanelTitle title="Cameras" action={<AddMenuButton label="Add camera" items={addCameraMenuItems} />} />
                     <div className="px-2 pb-2">{draft.cameras.map((camera) => <SceneRow key={camera.id} active={activeShot.cameraId === camera.id && !selectedObjectId && !selectedLightId} icon={<Camera />} label={camera.name} onClick={() => { setSelectedObjectId(null); setSelectedLightId(null); updateShot(activeShot.id, { cameraId: camera.id }); }} onDelete={() => removeCamera(camera.id)} />)}</div>
-                    <PanelTitle title="灯光" action={<AddMenuButton label="添加灯光" items={addLightMenuItems} />} />
+                    <PanelTitle title="Lighting" action={<AddMenuButton label="Add light" items={addLightMenuItems} />} />
                     <div className="px-2 pb-2">{draft.lights.map((light) => <SceneRow key={light.id} active={selectedLightId === light.id} icon={<Lightbulb />} label={light.name} onClick={() => setSelectedLightId(light.id)} onDelete={() => removeLight(light.id)} />)}</div>
-                    <PanelTitle title="快速添加" />
+                    <PanelTitle title="Quick add" />
                     <div className="grid grid-cols-2 gap-1.5 px-2 pb-3">
-                        <QuickAdd label="演员" icon={<UserRound />} onClick={addActor} />
-                        <QuickAdd label="立方体" icon={<Box />} onClick={() => addPrimitive("box", "立方体")} />
-                        <QuickAdd label="球体" icon={<Circle />} onClick={() => addPrimitive("sphere", "球体")} />
-                        <QuickAdd label="圆柱" icon={<Cuboid />} onClick={() => addPrimitive("cylinder", "圆柱")} />
-                        <QuickAdd label="上传模型" icon={<FileUp />} onClick={() => modelInputRef.current?.click()} />
-                        <QuickAdd label="添加灯光" icon={<LampDesk />} onClick={addLight} />
+                        <QuickAdd label="Actor" icon={<UserRound />} onClick={addActor} />
+                        <QuickAdd label="Box" icon={<Box />} onClick={() => addPrimitive("box", "Box")} />
+                        <QuickAdd label="Sphere" icon={<Circle />} onClick={() => addPrimitive("sphere", "Sphere")} />
+                        <QuickAdd label="Cylinder" icon={<Cuboid />} onClick={() => addPrimitive("cylinder", "Cylinder")} />
+                        <QuickAdd label="Upload model" icon={<FileUp />} onClick={() => modelInputRef.current?.click()} />
+                        <QuickAdd label="Add light" icon={<LampDesk />} onClick={addLight} />
                     </div>
-                    {modelAssets.length ? <><PanelTitle title="3D 素材" /><div className="px-2 pb-3">{modelAssets.map((asset) => <SceneRow key={asset.id} icon={<BoxSelect />} label={asset.title} onClick={() => addModelAsset(asset)} />)}</div></> : null}
-                    {imageNodes.length ? <><PanelTitle title="画布图片立牌" /><div className="px-2 pb-3">{imageNodes.slice(0, 20).map((node) => <SceneRow key={node.id} icon={<ImageIcon />} label={node.title} onClick={() => addBillboard(node)} onDelete={() => onDeleteImageNode(node.id)} />)}</div></> : null}
+                    {modelAssets.length ? <><PanelTitle title="3D assets" /><div className="px-2 pb-3">{modelAssets.map((asset) => <SceneRow key={asset.id} icon={<BoxSelect />} label={asset.title} onClick={() => addModelAsset(asset)} />)}</div></> : null}
+                    {imageNodes.length ? <><PanelTitle title="Canvas image cards" /><div className="px-2 pb-3">{imageNodes.slice(0, 20).map((node) => <SceneRow key={node.id} icon={<ImageIcon />} label={node.title} onClick={() => addBillboard(node)} onDelete={() => onDeleteImageNode(node.id)} />)}</div></> : null}
                     <input ref={modelInputRef} type="file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" className="hidden" onChange={(event) => { void uploadModel(event.target.files?.[0]); event.currentTarget.value = ""; }} />
                 </aside>
 
                 <main className="relative min-h-0 overflow-hidden bg-neutral-900">
                     <DirectorViewport ref={viewportRef} scene={draft} selectedObjectId={selectedObjectId} selectedBone={selectedBone} transformMode={transformMode} renderMode={renderMode} playhead={playhead} playing={playing} showMotionPaths={capabilities.timeline} viewMode={viewMode} onViewModeChange={setViewMode} onSelectObject={setSelectedObjectId} onSelectBone={setSelectedBone} onObjectTransform={handleObjectTransform} onBoneTransform={handleBoneTransform} onActorRigReady={handleActorRigReady} />
-                    <div className="pointer-events-none absolute left-3 top-3 text-[var(--fs-tiny)] font-medium text-white/70">{activeShot.name} · {activeCamera?.name || "无摄影机"} · {activeShot.duration}s</div>
+                    <div className="pointer-events-none absolute left-3 top-3 text-[var(--fs-tiny)] font-medium text-white/70">{activeShot.name} · {activeCamera?.name || "No camera"} · {activeShot.duration}s</div>
                     <CanvasDirectorOnboarding scope={onboardingScope} open={open} restartSignal={onboardingRestartSignal} className="absolute right-3 top-3 z-[var(--z-popover)] w-[min(360px,calc(100%-24px))]" />
                     <DirectorViewportDock transformMode={transformMode} renderMode={renderMode} renderModes={capabilities.renderModes} onTransformModeChange={setTransformMode} onRenderModeChange={setRenderMode} onAddActor={addActor} onAddBox={() => addPrimitive("box", "立方体")} onAddLight={addLight} onAddCamera={addCamera} onAlignCamera={alignCameraToView} />
                 </main>

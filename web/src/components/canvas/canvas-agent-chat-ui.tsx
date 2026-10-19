@@ -414,7 +414,7 @@ export function AgentChatComposer({
                             value={prompt}
                             references={references}
                             includeAssetLibrary={includeAssetLibrary}
-                            sendOnEnter={false}
+                            sendOnEnter
                             disabled={disabled}
                             onChange={handlePromptChange}
                             onSubmit={onSubmit}

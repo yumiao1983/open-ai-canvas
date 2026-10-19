@@ -132,6 +132,18 @@ func (r *Repository) Create(value any) error {
 	return r.db.Create(value).Error
 }
 
+func (r *Repository) UserChannelConfig(userID string) (*model.UserChannelConfig, error) {
+	var item model.UserChannelConfig
+	if err := r.db.First(&item, "user_id = ?", userID).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *Repository) SaveUserChannelConfig(item *model.UserChannelConfig) error {
+	return r.db.Save(item).Error
+}
+
 // Save 是低层兼容入口；涉及状态机或权限边界的写入不得绕过显式事务方法。
 func (r *Repository) Save(value any) error {
 	return r.db.Save(value).Error

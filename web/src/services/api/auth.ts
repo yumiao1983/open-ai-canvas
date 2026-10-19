@@ -45,6 +45,16 @@ export type AuthSessionPayload = {
     features?: FeatureAvailability;
 };
 
+export type PersonalChannelConfig = { channels: ModelChannel[] };
+
+export function getPersonalChannelConfig(signal?: AbortSignal) {
+    return request<PersonalChannelConfig>(api.get("/user/channel-config", { signal }));
+}
+
+export function savePersonalChannelConfig(channels: ModelChannel[]) {
+    return request<{ saved: boolean }>(api.put("/user/channel-config", { channels }));
+}
+
 export type RuntimeLimits = {
     activeTaskLimit: number;
     resourceUploadMB: number;

@@ -33,11 +33,11 @@ const CAPABILITIES: Record<DirectorMode, DirectorModeCapabilities> = {
     camera: { timeline: false, keyframes: false, bones: false, cameraTools: true, renderModes: ["beauty", "clay", "depth", "normal"] },
 };
 
-export const DIRECTOR_MODES: Array<{ mode: DirectorMode; label: string; hint: string }> = [
-    { mode: "layout", label: "摆场", hint: "摆放演员、道具与灯光" },
-    { mode: "pose", label: "姿态", hint: "调整选中演员的骨骼与姿势" },
-    { mode: "animate", label: "动画", hint: "时间轴、关键帧与 Auto Key" },
-    { mode: "camera", label: "摄影机", hint: "机位、对齐视图与运镜" },
+export const DIRECTOR_MODE_KEYS: Array<{ mode: DirectorMode; label: "director.layout" | "director.pose" | "director.animate" | "director.camera"; hint: "director.layoutHint" | "director.poseHint" | "director.animateHint" | "director.cameraHint" }> = [
+    { mode: "layout", label: "director.layout", hint: "director.layoutHint" },
+    { mode: "pose", label: "director.pose", hint: "director.poseHint" },
+    { mode: "animate", label: "director.animate", hint: "director.animateHint" },
+    { mode: "camera", label: "director.camera", hint: "director.cameraHint" },
 ];
 
 export const DIRECTOR_DEFAULT_MODE: DirectorMode = "layout";

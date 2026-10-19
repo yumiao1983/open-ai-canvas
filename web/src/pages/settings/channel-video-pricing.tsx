@@ -195,6 +195,16 @@ export function ChannelModelSettings({ channel, onChange }: { channel: ModelChan
 function inferCapabilityFromModel(model: string): ModelCapabilityChoice {
     const lower = model.toLowerCase();
     if (
+        lower.includes("audio") ||
+        lower.includes("tts") ||
+        lower.includes("voice") ||
+        lower.includes("speech") ||
+        lower.includes("sound") ||
+        lower.includes("music")
+    ) {
+        return "audio";
+    }
+    if (
         lower.includes("seedream") ||
         lower.includes("image") ||
         lower.includes("dall-e") ||
@@ -214,8 +224,8 @@ function inferCapabilityFromModel(model: string): ModelCapabilityChoice {
         lower.includes("veo") ||
         lower.includes("kling") ||
         lower.includes("seedance") ||
-        lower.includes("minimax") ||
         lower.includes("hailuo") ||
+        lower === "minimax-h3" ||
         lower.includes("pika") ||
         lower.includes("runway") ||
         lower.includes("omni") ||
@@ -223,16 +233,6 @@ function inferCapabilityFromModel(model: string): ModelCapabilityChoice {
         lower.includes("wan")
     ) {
         return "video";
-    }
-    if (
-        lower.includes("audio") ||
-        lower.includes("tts") ||
-        lower.includes("voice") ||
-        lower.includes("speech") ||
-        lower.includes("sound") ||
-        lower.includes("music")
-    ) {
-        return "audio";
     }
     return "text";
 }

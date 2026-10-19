@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { preloadWorkspaceRoute } from "@/lib/workspace-route-modules";
 import { useUserStore, type FeatureAvailability } from "@/stores/use-user-store";
 import { useAppearanceStore } from "@/stores/use-appearance-store";
+import { useTranslation, type TranslationKey } from "@/i18n";
 
 export type WorkspaceNavItem = {
     id: string;
@@ -29,49 +30,50 @@ type WorkspaceNavGroup = {
 };
 
 /** 设置页分区子项，沿用 /settings?section=<key> 路由合同。 */
-const SETTINGS_SECTIONS: Array<{ key: string; label: string }> = [
-    { key: "local-cli", label: "本机工具" },
-    { key: "channels", label: "自定义渠道" },
-    { key: "models", label: "模型选择" },
-    { key: "preferences", label: "生成偏好" },
-    { key: "prompts", label: "提示词偏好" },
-    { key: "storage", label: "我的对象存储" },
+const SETTINGS_SECTIONS: Array<{ key: string; label: TranslationKey }> = [
+    { key: "local-cli", label: "settings.localTools" },
+    { key: "channels", label: "settings.providers" },
+    { key: "models", label: "settings.models" },
+    { key: "preferences", label: "settings.preferences" },
+    { key: "prompts", label: "settings.prompts" },
+    { key: "storage", label: "settings.storage" },
 ];
 
-function toolItem(slug: NavigationToolSlug, to: string): WorkspaceNavItem {
+function toolItem(slug: NavigationToolSlug, to: string, t: (key: TranslationKey) => string): WorkspaceNavItem {
     const tool = navigationTools.find((item) => item.slug === slug);
-    return { id: slug, title: tool?.label ?? slug, icon: tool?.icon, to };
+    const keyBySlug: Record<NavigationToolSlug, TranslationKey> = { create: "nav.create", projects: "nav.projects", canvas: "nav.canvas", tasks: "nav.tasks", assets: "nav.assets", skills: "nav.skills", plugins: "nav.extensions", wallet: "nav.usage", settings: "nav.settings" };
+    return { id: slug, title: t(keyBySlug[slug]), icon: tool?.icon, to };
 }
 
-function buildNav(features: FeatureAvailability, balance: string, isAdmin: boolean): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
+function buildNav(features: FeatureAvailability, balance: string, isAdmin: boolean, t: (key: TranslationKey) => string): { groups: WorkspaceNavGroup[]; footer: WorkspaceNavItem[] } {
     const groups: WorkspaceNavGroup[] = [
         {
             items: [
-                { id: "home", title: "首页", icon: Home, to: "/" },
-toolItem("projects", "/projects"),
-                toolItem("canvas", "/canvas"),
-                ...(features.taskCenterEnabled ? [toolItem("tasks", "/tasks")] : []),
-                toolItem("assets", "/assets"),
+                { id: "home", title: t("nav.home"), icon: Home, to: "/" },
+                toolItem("projects", "/projects", t),
+                toolItem("canvas", "/canvas", t),
+                ...(features.taskCenterEnabled ? [toolItem("tasks", "/tasks", t)] : []),
+                toolItem("assets", "/assets", t),
             ],
         },
         {
-            heading: "工作台管理",
-            items: [toolItem("skills", "/skills"), ...(features.pluginCenterEnabled || isAdmin ? [toolItem("plugins", "/plugins")] : []), ...(features.creditsEnabled ? [{ ...toolItem("wallet", "/wallet"), badge: balance }] : [])],
+            heading: t("nav.manage"),
+            items: [toolItem("skills", "/skills", t), ...(features.pluginCenterEnabled || isAdmin ? [toolItem("plugins", "/plugins", t)] : []), ...(features.creditsEnabled ? [{ ...toolItem("wallet", "/wallet", t), badge: balance }] : [])],
         },
     ];
 
     const settingsSections = SETTINGS_SECTIONS.filter((section) => section.key !== "channels" || features.customChannelsEnabled);
     const footer: WorkspaceNavItem[] = [
-        ...(isAdmin ? [{ id: "admin", title: "管理员后台", icon: ShieldCheck, to: "/admin" }] : []),
+        ...(isAdmin ? [{ id: "admin", title: t("nav.admin"), icon: ShieldCheck, to: "/admin" }] : []),
         {
-            ...toolItem("settings", "/settings"),
+            ...toolItem("settings", "/settings", t),
             children: settingsSections.map((section) => ({
                 id: `settings:${section.key}`,
-                title: section.label,
+                title: t(section.label),
                 to: `/settings?section=${section.key}`,
             })),
         },
-        { id: "logout", title: "退出登录", icon: LogOut, action: "logout" },
+        { id: "logout", title: t("nav.signOut"), icon: LogOut, action: "logout" },
     ];
 
     return { groups, footer };
@@ -79,6 +81,7 @@ toolItem("projects", "/projects"),
 
 function WorkspaceSwitcher({ collapsed, onNavigate, onExpand }: { collapsed: boolean; onNavigate: () => void; onExpand: () => void }) {
     const appearance = useAppearanceStore((state) => state.appearance);
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const navigate = useNavigate();
 
@@ -91,7 +94,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate, onExpand }: { collapsed: boo
     if (collapsed) {
         return (
             <div className="app-workspace-sidebar-rail-header shrink-0">
-                <button type="button" className="app-workspace-sidebar-rail-button" aria-label="展开侧栏菜单" title="展开侧栏菜单" onClick={onExpand}>
+                <button type="button" className="app-workspace-sidebar-rail-button" aria-label="Expand sidebar" title="Expand sidebar" onClick={onExpand}>
                     <PanelLeftOpen className="size-4" strokeWidth={1.7} />
                 </button>
             </div>
@@ -111,7 +114,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate, onExpand }: { collapsed: boo
                     <BrandLogoFrame className="app-workspace-brand-mark grid size-8 shrink-0 place-items-center rounded-[var(--r-sm)] shadow-sm" logoClassName="size-5 object-contain" alt="" fallback={<InfinityIcon className="size-4" strokeWidth={2} />} />
                     <span className="flex min-w-0 flex-col">
                         <span className="app-workspace-brand-wordmark truncate text-[var(--fs-body)] leading-none font-medium">{appearance.brandName}</span>
-                        <span className="mt-1 truncate text-[var(--fs-label)] leading-none text-foreground/42">创作工作台</span>
+                        <span className="mt-1 truncate text-[var(--fs-label)] leading-none text-foreground/42">{t("nav.creativeWorkspace")}</span>
                     </span>
                 </span>
                 <ChevronDown className="size-4 shrink-0 text-foreground/40 transition-colors group-hover:text-foreground/70" strokeWidth={1.5} />
@@ -123,13 +126,13 @@ function WorkspaceSwitcher({ collapsed, onNavigate, onExpand }: { collapsed: boo
                     <div className="app-workspace-nav-popover absolute left-3 right-3 top-full z-50 mt-1 overflow-hidden rounded-lg border border-[var(--workspace-border)] bg-[var(--workspace-surface-strong)] py-1 animate-in fade-in zoom-in-95 duration-100">
                         <div className="px-3 py-2.5">
                             <div className="truncate text-[var(--fs-body)] font-semibold">{appearance.brandName}</div>
-                            <div className="mt-0.5 truncate text-[var(--fs-label)] text-foreground/45">创作工作台</div>
+                            <div className="mt-0.5 truncate text-[var(--fs-label)] text-foreground/45">{t("nav.creativeWorkspace")}</div>
                         </div>
                         <div className="mx-2 my-1 h-px bg-[var(--workspace-border)]" />
                         {[
-                            { label: "首页", to: "/" },
-                            { label: "画布", to: "/canvas" },
-                            { label: "设置", to: "/settings" },
+                            { label: t("nav.home"), to: "/" },
+                            { label: t("nav.canvas"), to: "/canvas" },
+                            { label: t("nav.settings"), to: "/settings" },
                         ].map((entry) => (
                             <button key={entry.to} type="button" onClick={() => go(entry.to)} className="flex w-full items-center gap-2 px-3 py-2 text-[var(--fs-body)] text-foreground/80 transition-colors hover:bg-surface-hover hover:text-foreground">
                                 {entry.label}
@@ -137,7 +140,7 @@ function WorkspaceSwitcher({ collapsed, onNavigate, onExpand }: { collapsed: boo
                         ))}
                         <div className="mx-2 my-1 h-px bg-[var(--workspace-border)]" />
                         <button type="button" onClick={() => go("/canvas?mode=new")} className="flex w-full items-center gap-2 px-3 py-2 text-[var(--fs-body)] text-foreground/45 transition-colors hover:bg-surface-hover hover:text-foreground">
-                            <Plus className="size-3.5" /> 新建画布
+                            <Plus className="size-3.5" /> {t("canvas.new")}
                         </button>
                     </div>
                 </>
@@ -299,10 +302,11 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
     const creditsEnabled = useUserStore((state) => state.features.creditsEnabled);
     const { availableMicrocredits } = useWalletBalance(user?.id, creditsEnabled);
     const { handleLogout } = useWorkspaceLogout();
+    const { t, locale } = useTranslation();
 
-    const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+    const balance = availableMicrocredits === null ? "--" : (availableMicrocredits / 1_000_000).toLocaleString(locale, { maximumFractionDigits: 2 });
 
-    const { groups, footer } = useMemo(() => buildNav(features, balance, user?.role === "admin"), [features, balance, user?.role]);
+    const { groups, footer } = useMemo(() => buildNav(features, balance, user?.role === "admin", t), [features, balance, t, user?.role]);
 
     const slug = pathname.split("/").filter(Boolean)[0] || "home";
     const section = searchParams.get("section");
@@ -332,11 +336,11 @@ export function WorkspaceSidebarNav({ collapsed, onNavigate, onOpenSearch, onExp
                     type="button"
                     onClick={onOpenSearch}
                     className="group flex h-9 w-full items-center gap-2 rounded-[var(--r-lg)] bg-foreground/5 px-3 text-left text-[var(--fs-caption)] text-muted-foreground transition-colors hover:bg-foreground/[.07] hover:text-foreground/70"
-                    aria-label={collapsed ? "快速搜索" : undefined}
-                    title={collapsed ? "快速搜索" : undefined}
+                    aria-label={collapsed ? t("nav.search") : undefined}
+                    title={collapsed ? t("nav.search") : undefined}
                 >
                     <Search className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground/70" strokeWidth={1.6} />
-                    <span className="app-workspace-sidebar-search-label flex-1 truncate">快速搜索</span>
+                    <span className="app-workspace-sidebar-search-label flex-1 truncate">{t("nav.search")}</span>
                     <Kbd className="app-workspace-sidebar-search-shortcut">⌘K</Kbd>
                 </button>
             </div>

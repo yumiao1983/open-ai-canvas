@@ -1,4 +1,4 @@
-import { getFeatureAvailability, type AuthSessionPayload } from "@/services/api/auth";
+import { getFeatureAvailability, getPersonalChannelConfig, type AuthSessionPayload } from "@/services/api/auth";
 import { getModelCatalog, listLogicalModels, type CapabilitySpec, type ModelCatalogResponse, type OptionConstraint, type PublicChannelCatalog, type PublicLogicalModel } from "@/services/api/logical-models";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { appQueryClient } from "@/lib/query-client";
@@ -78,6 +78,16 @@ export async function applyUserSession(payload: AuthSessionPayload) {
                 useConfigStore.getState().mergeSystemChannels(managedModelChannels(catalog.models));
             } else if (catalog.source === "system" && catalog.channels) {
                 useConfigStore.getState().mergeSystemChannels(systemChannelModelChannels(catalog.channels));
+            }
+        }
+        // 个人渠道改由服务端加密保存。登录后以数据库为真相恢复，避免刷新、
+        // 浏览器缓存清理或本地 scope 变化导致渠道与模型目录消失。
+        if (payload.user?.id) {
+            const remoteChannels = await getPersonalChannelConfig();
+            if (remoteChannels.channels.length) {
+                const currentConfig = useConfigStore.getState().config;
+                const systemChannels = currentConfig.channels.filter((channel) => channel.scope === "system");
+                useConfigStore.getState().replaceConfig(normalizeConfigSnapshot({ config: { ...currentConfig, channels: [...systemChannels, ...remoteChannels.channels] } }).config);
             }
         }
         installRemoteUserDataAutoSync();

@@ -17,6 +17,7 @@ import (
 func Models() []any {
 	return []any{
 		&model.User{},
+		&model.UserChannelConfig{},
 		&model.AuthSession{},
 		&model.UserIdentity{},
 		&model.OAuthState{},
